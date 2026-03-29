@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fill Axis — Game</title>
+<script src="engine/crypto.js"></script>
+<script src="engine/storage.js"></script>
+<script src="engine/identity.js"></script>
+<script src="engine/pieces.js"></script>
+<script src="engine/board.js"></script>
+<script src="engine/game.js"></script>
+<script src="engine/async-game.js"></script>
+<style>
+:root{--bg:#1a1a2e;--panel:#16213e;--border:#0f3460;--accent:#e94560;--p1:#4fc3f7;--p1bg:rgba(79,195,247,.1);
+  --p2:#ff8a65;--p2bg:rgba(255,138,101,.1);--green:#69f0ae;--yellow:#ffd54f;--red:#ff5252;
+  --cell:#0d1b2a;--text:#e0e0e0;--muted:#778;--mono:'Fira Mono','Consolas',monospace;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;}
+nav{display:flex;gap:6px;background:var(--panel);padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;}
+nav a{color:var(--muted);text-decoration:none;padding:5px 12px;border-radius:4px;font-size:.88rem;}
+nav a:hover{background:rgba(233,69,96,.15);color:var(--accent);}
+#nav-code{font-family:var(--mono);font-weight:800;letter-spacing:3px;color:var(--accent);margin-left:auto;font-size:.9rem;}
+.page{max-width:860px;margin:0 auto;padding:20px 16px;}
+.banner{padding:10px 18px;border-radius:8px;font-size:.95rem;font-weight:700;margin-bottom:14px;text-align:center;}
+.banner.myturn{background:var(--p1bg);border:1px solid var(--p1);color:var(--p1);}
+.banner.theirturn{background:rgba(255,213,79,.08);border:1px solid var(--yellow);color:var(--yellow);}
+.banner.waiting{background:rgba(79,195,247,.08);border:1px solid var(--border);color:var(--muted);}
+.banner.reveal{background:rgba(233,69,96,.12);border:1px solid var(--accent);color:var(--accent);}
+.banner.final{background:rgba(105,240,174,.1);border:1px solid var(--green);color:var(--green);}
+.layout{display:grid;grid-template-columns:130px 1fr 130px;gap:16px;align-items:start;}
+@media(max-width:600px){.layout{grid-template-columns:1fr;}}
+.tray{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px;}
+.tray-title{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.piece-item{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:6px;border:1px solid var(--border);
+  margin-bottom:6px;cursor:grab;background:var(--cell);transition:border-color .12s;}
+.piece-item:hover{border-color:var(--accent);}
+.piece-item.empty{opacity:.3;pointer-events:none;}
+.piece-item.dragging{opacity:.4;}
+.pi-icon{font-size:1.2rem;width:24px;text-align:center;}
+.pi-info{font-size:.72rem;line-height:1.3;}
+.pi-name{font-weight:700;}
+.pi-count{color:var(--muted);}
+.board-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;}
+#board{display:grid;border:2px solid var(--border);border-radius:4px;}
+.cell{width:64px;height:64px;background:var(--cell);border:1px solid #1e3050;display:flex;
+  align-items:center;justify-content:center;font-size:1.4rem;position:relative;cursor:default;transition:background .1s;}
+.cell.drop-ok{background:#1a2f47;cursor:copy;}
+.cell.drop-ok:hover{background:#253d5c;}
+.cell.drop-bad{background:rgba(233,69,96,.12);cursor:not-allowed;}
+.cell.atk-p1{background:rgba(79,195,247,.12);}
+.cell.atk-p2{background:rgba(255,138,101,.12);}
+.cell.atk-both{background:rgba(255,235,59,.1);}
+.tile{width:48px;height:48px;border-radius:8px;border:2px solid transparent;display:flex;
+  align-items:center;justify-content:center;font-size:1.2rem;pointer-events:none;}
+.tile-p1{background:rgba(79,195,247,.2);border-color:var(--p1);}
+.tile-p2{background:rgba(255,138,101,.2);border-color:var(--p2);}
+.tile-hidden{background:rgba(255,255,255,.06);border-color:#2a3550;font-size:.9rem;color:#556;}
+.tile-dead{opacity:.22;}
+#drag-ghost{position:fixed;pointer-events:none;z-index:1000;display:none;font-size:2rem;transform:translate(-50%,-50%);}
+.scores{display:flex;gap:12px;justify-content:center;}
+.score-box{text-align:center;padding:8px 16px;border-radius:6px;min-width:80px;}
+.score-box.p1{background:var(--p1bg);border:1px solid var(--p1);}
+.score-box.p2{background:var(--p2bg);border:1px solid var(--p2);}
+.score-val{font-size:1.6rem;font-weight:900;}
+.score-name{font-size:.72rem;color:var(--muted);}
+.actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+button{cursor:pointer;border:none;border-radius:6px;padding:9px 20px;font-size:.88rem;font-weight:700;}
+button:hover{opacity:.83;}
+.btn-a{background:var(--accent);color:#fff;}
+.btn-b{background:var(--border);color:var(--text);}
+.status-bar{font-size:.78rem;color:var(--muted);text-align:center;padding:6px;min-height:24px;}
+.status-bar.ok{color:var(--green);}
+.status-bar.err{color:var(--red);}
+.poll-dot{display:inline-block;width:6px;height:6px;background:var(--yellow);border-radius:50%;margin-right:4px;
+  animation:pulse 1.4s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:.2;}50%{opacity:1;}}
+.phase-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px;}
+.phase-card h3{font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.val{font-family:var(--mono);font-size:.7rem;background:var(--cell);padding:6px 9px;border-radius:4px;
+  word-break:break-all;border:1px solid var(--border);margin:4px 0;}
+.val.ok{border-color:var(--green);color:var(--green);}
+.val.bad{border-color:var(--red);color:var(--red);}
+.val.hash{color:var(--yellow);}
+</style>
+</head>
+<body>
+<nav>
+  <a href="lobby.html">← Lobby</a>
+  <a href="rules.html">📖 Rules</a>
+  <span id="nav-code">...</span>
+</nav>
+<div class="page">
+  <div class="banner waiting" id="banner">Loading game...</div>
+
+  <!-- PHASE-SPECIFIC CARDS (shown/hidden per phase) -->
+  <div id="phase-ui"></div>
+
+  <!-- BOARD AREA -->
+  <div id="game-ui" style="display:none">
+    <div class="scores" id="scores" style="margin-bottom:12px;"></div>
+    <div class="layout">
+      <div class="tray" id="tray-mine"><div class="tray-title" id="tray-mine-label">Your Pieces</div></div>
+      <div class="board-wrap">
+        <div id="board"></div>
+        <div class="actions" id="actions"></div>
+        <div class="status-bar" id="status-bar"></div>
+      </div>
+      <div class="tray" id="tray-theirs"><div class="tray-title" id="tray-theirs-label">Opponent</div></div>
+    </div>
+  </div>
+</div>
+<div id="drag-ghost">?</div>
+
+<script>
+// ─── BOOT ─────────────────────────────────────────────────────────────────────
+const params = new URLSearchParams(location.search);
+const GAME_CODE = (params.get('game') || '').toUpperCase();
+if (!GAME_CODE) { location.href = 'lobby.html'; }
+document.getElementById('nav-code').textContent = GAME_CODE;
+
+const PIECE_TYPES_DATA = {
+  KING:  { icon:'♛', name:'General',    desc:'Cross (+4)' },
+  VERT:  { icon:'|',  name:'Vertical',   desc:'Column' },
+  HORZ:  { icon:'—',  name:'Horizontal', desc:'Row' },
+  X:     { icon:'✕',  name:'Diagonal',   desc:'Diagonals' },
+};
+
+let myDeviceId, myName, myKeyPair, myTeam;
+let blob = null;          // current game blob from storage
+let localState = null;    // { pieces, salt, tray, tilesPerTurn, tilesPlaced }
+let drag = null;
+let pollTimer = null;
+
+async function boot() {
+  myDeviceId = getDeviceId();
+  myName = getDisplayName();
+  myKeyPair = await getKeyPair();
+  blob = await asyncLoadGame(GAME_CODE);
+  if (!blob) { setStatus('Game not found: ' + GAME_CODE, true); return; }
+  myTeam = blob.players.findIndex(p => p?.deviceId === myDeviceId);
+  if (myTeam < 0) { setStatus("You're not a player in this game.", true); return; }
+  addActiveGame(GAME_CODE);
+  renderPhase();
+}
+
+// ─── PHASE ROUTER ────────────────────────────────────────────────────────────
+function renderPhase() {
+  const phase = blob.phase;
+  document.getElementById('game-ui').style.display = 'none';
+
+  if (phase === 'WAITING')    return phaseWaiting();
+  if (phase === 'PLACEMENT')  return phasePlacement();
+  if (phase === 'COMMITTED')  return phaseCommitted();
+  if (phase === 'REVEALED')   return phaseRevealed();
+  if (phase === 'FINAL')      return phaseFinal();
+}
+
+// ─── WAITING ─────────────────────────────────────────────────────────────────
+function phaseWaiting() {
+  setBanner('⏳ Waiting for opponent to join', 'waiting');
+  document.getElementById('phase-ui').innerHTML = `
+    <div class="phase-card">
+      <h3>Room Code</h3>
+      <div style="font-size:2rem;font-weight:900;letter-spacing:6px;color:var(--accent);text-align:center;
+           padding:12px;background:var(--cell);border-radius:6px;margin-bottom:10px;">${GAME_CODE}</div>
+      <p style="font-size:.85rem;color:var(--muted);">Share this code with your opponent. They visit lobby.html and click "Join".</p>
+    </div>`;
+  poll(5000);
+}
+
+// ─── PLACEMENT ───────────────────────────────────────────────────────────────
+function phasePlacement() {
+  const isMyTurn = blob.currentTeam === myTeam;
+  const size = blob.boardSize;
+  const counts = getPieceCountsForSize(size);
+  const tilesPerTurn = getTilesPerTurn(size);
+
+  // Init local state if not yet started
+  if (!localState) {
+    localState = getLocalGameState(GAME_CODE);
+    if (!localState) {
+      localState = {
+        pieces: [],
+        salt: generateSalt(),
+        tray: { ...counts },
+        tilesPerTurn,
+        tilesPlaced: 0,
+      };
+      saveLocalGameState(GAME_CODE, localState);
+    }
+  }
+
+  const opponentPlaced = blob.players[1 - myTeam]?.pieceCount != null;
+  const myPlaced = blob.players[myTeam]?.commitment != null;
+
+  if (myPlaced) {
+    // I've committed — waiting for opponent
+    setBanner('✅ You committed. Waiting for opponent to finish placing...', 'theirturn');
+    document.getElementById('phase-ui').innerHTML = `
+      <div class="phase-card">
+        <h3>Your commitment (locked)</h3>
+        <div class="val hash">${blob.players[myTeam].commitment}</div>
+        <p style="font-size:.8rem;color:var(--muted);margin-top:8px;">
+          Your board is locked. When your opponent commits, both boards will be revealed simultaneously.
+        </p>
+      </div>`;
+    poll(8000);
+    return;
+  }
+
+  setBanner(isMyTurn ? `🎯 Place your pieces — ${tilesPerTurn - localState.tilesPlaced} remaining this turn` : '⏳ Opponent is placing...', isMyTurn ? 'myturn' : 'theirturn');
+  document.getElementById('game-ui').style.display = '';
+  renderBoard(size, true);
+  renderTrays(size);
+  renderScores();
+  renderPlacementActions(isMyTurn, tilesPerTurn);
+
+  if (!isMyTurn) poll(8000);
+}
+
+// ─── COMMITTED ───────────────────────────────────────────────────────────────
+function phaseCommitted() {
+  // Both players have committed. Need to reveal.
+  const myRevealDone = blob.players[myTeam]?.revealedPieces;
+  if (myRevealDone) {
+    setBanner('⏳ Waiting for opponent to reveal...', 'theirturn');
+    poll(5000);
+  } else {
+    setBanner('⚡ Both committed — time to reveal!', 'reveal');
+  }
+  document.getElementById('phase-ui').innerHTML = `
+    <div class="phase-card">
+      <h3>Commitment Exchange Complete</h3>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">
+        Both boards are locked. Reveal to see the result.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:4px;">P1 commitment</div>
+          <div class="val hash">${blob.players[0]?.commitment?.slice(0,32) || '—'}...</div>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:4px;">P2 commitment</div>
+          <div class="val hash">${blob.players[1]?.commitment?.slice(0,32) || '—'}...</div>
+        </div>
+      </div>
+      ${!myRevealDone ? `<button class="btn-a" onclick="doReveal()">🔓 Reveal My Board</button>` : '<p style="color:var(--green);font-size:.85rem;">✅ Your board revealed. Waiting for opponent.</p>'}
+    </div>`;
+}
+
+// ─── REVEALED ────────────────────────────────────────────────────────────────
+async function phaseRevealed() {
+  setBanner('🔍 Verifying and resolving battle...', 'reveal');
+  document.getElementById('phase-ui').innerHTML = '<div class="phase-card"><h3>Running verification...</h3></div>';
+
+  // Verify opponent's reveal
+  const result = await asyncVerifyReveal(blob, 1 - myTeam);
+  if (!result.valid) {
+    document.getElementById('phase-ui').innerHTML = `
+      <div class="phase-card">
+        <h3>Verification Failed</h3>
+        <div class="val bad">❌ ${result.error}</div>
+        <p style="color:var(--red);font-size:.85rem;margin-top:8px;">Opponent's board does not match their commitment. Game result is void.</p>
+      </div>`;
+    setBanner('❌ Cheat detected', 'reveal');
+    return;
+  }
+
+  // Merge pieces and run battle
+  const myPieces   = localState.pieces.map(p => ({...p, team: myTeam,     dead: false}));
+  const theirPieces = blob.players[1 - myTeam].revealedPieces.map(p => ({...p, team: 1-myTeam, dead: false}));
+  let allPieces = [...myPieces, ...theirPieces];
+
+  // Battle resolution
+  let round = 0;
+  while (round < 20) {
+    const elim = resolveBattleRound(allPieces, blob.boardSize);
+    if (!elim.length) break;
+    round++;
+  }
+
+  // Evaluate winner
+  const map = buildAttackMap(allPieces, blob.boardSize);
+  const territory = getTerritoryCount(map, blob.boardSize);
+  const kings = [0,1].map(t => allPieces.filter(p=>p.type==='KING'&&p.team===t&&!p.dead).length);
+  const kingsPerPlayer = getPieceCountsForSize(blob.boardSize).KING;
+  const threshold = kingsPerPlayer === 1 ? 1 : 2;
+  let winner = null, reason = 'by Territory';
+  if (kings[0]-kings[1]>=threshold||(kings[1]===0&&kings[0]>0)){winner=0;reason='by General';}
+  else if(kings[1]-kings[0]>=threshold||(kings[0]===0&&kings[1]>0)){winner=1;reason='by General';}
+  else if(territory[0]>territory[1])winner=0;
+  else if(territory[1]>territory[0])winner=1;
+
+  // Save final state
+  await asyncFinalizeGame(GAME_CODE, winner, reason, territory);
+  // Save audit with our salt
+  await saveAuditChain(GAME_CODE, {
+    roomCode: GAME_CODE,
+    names: blob.players.map(p=>p?.name||'?'),
+    boardSize: blob.boardSize,
+    winner, winReason: reason,
+    p1Commitment: blob.players[0].commitment,
+    p2Commitment: blob.players[1].commitment,
+    p1Salt: myTeam===0 ? localState.salt : null,
+    p2Salt: myTeam===1 ? localState.salt : null,
+    pieces: allPieces.map(p=>({x:p.x,y:p.y,type:p.type,team:p.team,dead:p.dead})),
+    savedAt: new Date().toISOString(),
+  }, {});
+
+  blob = await asyncLoadGame(GAME_CODE);
+  phaseFinal(allPieces, territory, winner, reason, result);
+}
+
+// ─── FINAL ───────────────────────────────────────────────────────────────────
+async function phaseFinal(piecesOverride, terr, winOverride, reasonOverride, verifyResult) {
+  const w = winOverride ?? blob.winningTeam;
+  const r = reasonOverride ?? blob.winReason;
+  const territory = terr ?? blob.territory ?? {0:0,1:0};
+  const names = blob.players.map(p=>p?.name||'?');
+
+  setBanner(w===null?'Draw!': `${names[w]} Wins ${r}`, 'final');
+
+  const verifyHtml = verifyResult ? `
+    <div class="val ${verifyResult.valid?'ok':'bad'}" style="margin-bottom:8px;">
+      ${verifyResult.valid ? '✅ Opponent board verified — game was fair' : '❌ Cheat detected: ' + verifyResult.error}
+    </div>` : '';
+
+  document.getElementById('phase-ui').innerHTML = `
+    <div class="phase-card">
+      <h3>Final Result</h3>
+      ${verifyHtml}
+      <div style="display:flex;gap:16px;justify-content:center;margin:14px 0;">
+        <div class="score-box p1"><div class="score-val">${territory[0]}</div><div class="score-name">${names[0]}</div></div>
+        <div class="score-box p2"><div class="score-val">${territory[1]}</div><div class="score-name">${names[1]}</div></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <a href="audit.html?game=${GAME_CODE}" class="btn-a" style="text-decoration:none;padding:9px 20px;
+           border-radius:6px;font-weight:700;font-size:.88rem;background:var(--accent);color:#fff;">📋 View Audit</a>
+        <a href="lobby.html" class="btn-b" style="text-decoration:none;padding:9px 20px;
+           border-radius:6px;font-weight:700;font-size:.88rem;background:var(--border);color:var(--text);">← Back to Lobby</a>
+      </div>
+    </div>`;
+
+  if (piecesOverride) {
+    document.getElementById('game-ui').style.display = '';
+    const map = buildAttackMap(piecesOverride, blob.boardSize);
+    renderBoardFinal(blob.boardSize, piecesOverride, map);
+    const t = getTerritoryCount(map, blob.boardSize);
+    renderScoreBoxes(t, names);
+  }
+}
+
+// ─── ACTIONS ─────────────────────────────────────────────────────────────────
+function renderPlacementActions(isMyTurn, tilesPerTurn) {
+  const el = document.getElementById('actions');
+  const remaining = tilesPerTurn - localState.tilesPlaced;
+  if (isMyTurn && remaining <= 0) {
+    el.innerHTML = `<button class="btn-a" onclick="endPlacementTurn()">End Turn →</button>`;
+  } else if (isMyTurn) {
+    el.innerHTML = `<span style="font-size:.82rem;color:var(--muted)">Place ${remaining} more piece(s)</span>`;
+  } else {
+    el.innerHTML = `<span style="font-size:.82rem;color:var(--yellow)"><span class="poll-dot"></span>Waiting for opponent...</span>`;
+  }
+}
+
+async function endPlacementTurn() {
+  setStatus('Submitting turn...', false);
+  // Check if all my pieces are placed
+  const counts = getPieceCountsForSize(blob.boardSize);
+  const total = Object.values(counts).reduce((a,b)=>a+b,0);
+  const myPieceCount = localState.pieces.length;
+  const allPlaced = myPieceCount >= total;
+
+  if (allPlaced) {
+    // Commit
+    const boardStr = boardStateString(localState.pieces);
+    const commitment = await sha256(boardStr + localState.salt);
+    blob = await asyncSubmitCommitment(GAME_CODE, myTeam, commitment, myPieceCount, myKeyPair.privateKey);
+    saveLocalGameState(GAME_CODE, localState);
+    setStatus('Board committed. Waiting for opponent.', false);
+  } else {
+    // Just end turn, advance to opponent
+    blob.currentTeam = 1 - myTeam;
+    blob.updatedAt = new Date().toISOString();
+    await blobWrite(asyncBlobName(GAME_CODE), blob);
+    blob = await asyncLoadGame(GAME_CODE);
+  }
+  renderPhase();
+}
+
+async function doReveal() {
+  setStatus('Revealing board...', false);
+  blob = await asyncSubmitReveal(GAME_CODE, myTeam, localState.pieces, localState.salt, myKeyPair.privateKey);
+  renderPhase();
+}
+
+// ─── BOARD RENDER ─────────────────────────────────────────────────────────────
+function renderBoard(size, interactive) {
+  const board = document.getElementById('board');
+  board.style.gridTemplateColumns = `repeat(${size}, 64px)`;
+  board.innerHTML = '';
+  for (let y = size-1; y>=0; y--) {
+    for (let x=0; x<size; x++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.x = x; cell.dataset.y = y;
+      const piece = localState?.pieces.find(p=>p.x===x&&p.y===y);
+      if (piece) {
+        const t = document.createElement('div');
+        t.className = 'tile tile-p' + (myTeam+1);
+        t.textContent = PIECE_TYPES_DATA[piece.type]?.icon || '?';
+        t.style.color = myTeam===0 ? 'var(--p1)' : 'var(--p2)';
+        cell.appendChild(t);
+      } else if (interactive && drag) {
+        cell.classList.add('drop-ok');
+      }
+      board.appendChild(cell);
+    }
+  }
+}
+
+function renderBoardFinal(size, pieces, map) {
+  const board = document.getElementById('board');
+  board.style.gridTemplateColumns = `repeat(${size}, 64px)`;
+  board.innerHTML = '';
+  for (let y = size-1; y>=0; y--) {
+    for (let x=0; x<size; x++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const atk = map[x][y];
+      if (atk[0]>0&&atk[1]>0) cell.classList.add('atk-both');
+      else if (atk[0]>atk[1]) cell.classList.add('atk-p1');
+      else if (atk[1]>atk[0]) cell.classList.add('atk-p2');
+      const piece = pieces.find(p=>p.x===x&&p.y===y);
+      if (piece) {
+        const t = document.createElement('div');
+        t.className = 'tile tile-p' + (piece.team+1) + (piece.dead?' tile-dead':'');
+        t.textContent = PIECE_TYPES_DATA[piece.type]?.icon || '?';
+        t.style.color = piece.team===0 ? 'var(--p1)' : 'var(--p2)';
+        cell.appendChild(t);
+      }
+      board.appendChild(cell);
+    }
+  }
+}
+
+// ─── TRAYS ────────────────────────────────────────────────────────────────────
+let selectedType = 'KING';
+
+function renderTrays(size) {
+  const myTray = document.getElementById('tray-mine');
+  while (myTray.children.length > 1) myTray.removeChild(myTray.lastChild);
+  document.getElementById('tray-mine-label').textContent = myName + ' (You)';
+  document.getElementById('tray-theirs-label').textContent = blob.players[1-myTeam]?.name || 'Opponent';
+
+  const color = myTeam===0 ? 'var(--p1)' : 'var(--p2)';
+  for (const [type, info] of Object.entries(PIECE_TYPES_DATA)) {
+    const count = localState.tray[type] || 0;
+    const div = document.createElement('div');
+    div.className = 'piece-item' + (count===0?' empty':'');
+    div.innerHTML = `<span class="pi-icon" style="color:${color}">${info.icon}</span>
+      <span class="pi-info"><span class="pi-name">${info.name}</span><br><span class="pi-count">×${count}</span></span>`;
+    if (count > 0 && blob.currentTeam === myTeam) {
+      div.addEventListener('mousedown', e => { e.preventDefault(); startDrag(type, e); });
+      div.addEventListener('touchstart', e => { e.preventDefault(); startDrag(type, e); }, {passive:false});
+    }
+    myTray.appendChild(div);
+  }
+}
+
+function renderScores() {
+  const map = buildAttackMap(localState?.pieces||[], blob.boardSize);
+  const t = getTerritoryCount(map, blob.boardSize);
+  renderScoreBoxes(t, blob.players.map(p=>p?.name||'?'));
+}
+
+function renderScoreBoxes(t, names) {
+  document.getElementById('scores').innerHTML = `
+    <div class="score-box p1"><div class="score-val">${t[0]}</div><div class="score-name">${names[0]}</div></div>
+    <div class="score-box p2"><div class="score-val">${t[1]}</div><div class="score-name">${names[1]}</div></div>`;
+}
+
+// ─── DRAG ─────────────────────────────────────────────────────────────────────
+const ghost = document.getElementById('drag-ghost');
+
+function startDrag(type, e) {
+  drag = type;
+  ghost.textContent = PIECE_TYPES_DATA[type].icon;
+  ghost.style.color = myTeam===0 ? 'var(--p1)' : 'var(--p2)';
+  ghost.style.display = 'block';
+  moveDragGhost(e);
+  renderBoard(blob.boardSize, true);
+}
+
+function moveDragGhost(e) {
+  const cx = e.touches?e.touches[0].clientX:e.clientX;
+  const cy = e.touches?e.touches[0].clientY:e.clientY;
+  ghost.style.left = cx+'px'; ghost.style.top = cy+'px';
+}
+
+function endDrag(e) {
+  ghost.style.display='none';
+  if (!drag) return;
+  const savedDrag = drag; drag = null;
+  const cx = e.changedTouches?e.changedTouches[0].clientX:e.clientX;
+  const cy = e.changedTouches?e.changedTouches[0].clientY:e.clientY;
+  const el = document.elementFromPoint(cx, cy);
+  const cell = el&&(el.classList.contains('cell')?el:el.closest('.cell'));
+  if (cell) {
+    const x=parseInt(cell.dataset.x), y=parseInt(cell.dataset.y);
+    const occ = localState.pieces.find(p=>p.x===x&&p.y===y);
+    if (!occ && localState.tray[savedDrag] > 0) {
+      localState.pieces.push({x,y,type:savedDrag,team:myTeam,dead:false});
+      localState.tray[savedDrag]--;
+      localState.tilesPlaced++;
+      saveLocalGameState(GAME_CODE, localState);
+      renderBoard(blob.boardSize, true);
+      renderTrays(blob.boardSize);
+      renderScores();
+      renderPlacementActions(true, localState.tilesPerTurn);
+    }
+  }
+  renderBoard(blob.boardSize, false);
+}
+
+document.addEventListener('mousemove', e => drag&&moveDragGhost(e));
+document.addEventListener('touchmove', e => drag&&moveDragGhost(e), {passive:true});
+document.addEventListener('mouseup', endDrag);
+document.addEventListener('touchend', endDrag);
+
+// ─── POLLING ──────────────────────────────────────────────────────────────────
+function poll(intervalMs) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const fresh = await asyncLoadGame(GAME_CODE);
+    if (fresh && JSON.stringify(fresh.updatedAt) !== JSON.stringify(blob.updatedAt)) {
+      blob = fresh;
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      renderPhase();
+    }
+  }, intervalMs);
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function setBanner(msg, cls) {
+  const el = document.getElementById('banner');
+  el.textContent = msg; el.className = 'banner ' + cls;
+}
+function setStatus(msg, isErr) {
+  const el = document.getElementById('status-bar');
+  el.textContent = msg;
+  el.className = 'status-bar' + (isErr?' err':' ok');
+}
+function asyncBlobName(code) { return `game-async-${code}-state.json`; }
+
+// ─── GO ───────────────────────────────────────────────────────────────────────
+boot();
+</script>
+</body>
+</html>

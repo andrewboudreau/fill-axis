@@ -475,14 +475,20 @@ async function saveGameAudit() {
   if (!currentRoomCode) return;
   try {
     // Build a final audit record: pieces, commitments, salts, winner
+    const myPieces = G.pieces.filter(p => p.team === myTeam);
     const auditData = {
       roomCode: currentRoomCode,
       names: G.names,
       boardSize: G.size,
       winner: G.winner,
       winReason: G.winReason,
+      // Commitments — both now public (reveal phase has passed)
       p1Commitment: myTeam === 0 ? myCommitment : opponentCommitment,
       p2Commitment: myTeam === 1 ? myCommitment : opponentCommitment,
+      // Salt included — game is over, secret is already revealed to opponent via REVEAL message
+      // Salt is random-per-game noise; including it enables full re-verification
+      p1Salt: myTeam === 0 ? mySalt : null,  // only know our own salt
+      p2Salt: myTeam === 1 ? mySalt : null,
       pieces: G.pieces.map(p => ({ x:p.x, y:p.y, type:p.type, team:p.team, dead:p.dead })),
       savedAt: new Date().toISOString(),
     };

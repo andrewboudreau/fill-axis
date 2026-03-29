@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fill Axis — Lobby</title>
+<script src="engine/crypto.js"></script>
+<script src="engine/storage.js"></script>
+<script src="engine/identity.js"></script>
+<script src="engine/pieces.js"></script>
+<script src="engine/async-game.js"></script>
+<style>
+:root{--bg:#1a1a2e;--panel:#16213e;--border:#0f3460;--accent:#e94560;--p1:#4fc3f7;--p2:#ff8a65;
+  --green:#69f0ae;--yellow:#ffd54f;--red:#ff5252;--cell:#0d1b2a;--text:#e0e0e0;--muted:#778;--mono:'Fira Mono','Consolas',monospace;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;}
+nav{display:flex;gap:6px;background:var(--panel);padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+nav a{color:var(--muted);text-decoration:none;padding:5px 12px;border-radius:4px;font-size:.88rem;}
+nav a:hover,nav a.active{background:rgba(233,69,96,.15);color:var(--accent);}
+.page{max-width:900px;margin:0 auto;padding:24px 16px;}
+
+/* ── IDENTITY BAR ── */
+.identity-bar{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--border);
+  border-radius:10px;padding:14px 18px;margin-bottom:24px;flex-wrap:wrap;}
+.id-avatar{width:44px;height:44px;border-radius:50%;background:var(--accent);display:flex;align-items:center;
+  justify-content:center;font-size:1.3rem;font-weight:900;color:#fff;flex-shrink:0;}
+.id-info{flex:1;min-width:0;}
+.id-name{font-weight:700;font-size:1rem;}
+.id-code{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:2px;word-break:break-all;}
+.id-edit{background:var(--border);border:none;border-radius:5px;color:var(--text);padding:5px 12px;
+  cursor:pointer;font-size:.8rem;}
+.id-edit:hover{background:var(--accent);color:#fff;}
+.id-share-btn{background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted);
+  padding:5px 12px;cursor:pointer;font-size:.78rem;}
+.id-share-btn:hover{border-color:var(--p1);color:var(--p1);}
+.copied{color:var(--green)!important;border-color:var(--green)!important;}
+
+/* ── GAME GRID ── */
+.games-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.games-header h2{font-size:.88rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px;}
+.new-btn{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 18px;
+  font-size:.88rem;font-weight:700;cursor:pointer;}
+.new-btn:hover{opacity:.85;}
+.game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.game-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;
+  cursor:pointer;transition:border-color .15s,transform .1s;position:relative;}
+.game-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.game-card.my-turn{border-color:var(--green);}
+.game-card.waiting{border-color:var(--yellow);}
+.game-card.done{border-color:var(--border);opacity:.65;}
+.gc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.gc-code{font-family:var(--mono);font-size:.85rem;font-weight:800;letter-spacing:3px;color:var(--accent);}
+.gc-badge{font-size:.7rem;padding:3px 8px;border-radius:10px;font-weight:700;}
+.badge-myturn{background:rgba(105,240,174,.15);color:var(--green);border:1px solid var(--green);}
+.badge-waiting{background:rgba(255,213,79,.12);color:var(--yellow);border:1px solid var(--yellow);}
+.badge-done{background:rgba(128,128,128,.1);color:var(--muted);border:1px solid #334;}
+.badge-waiting-player{background:rgba(79,195,247,.12);color:var(--p1);border:1px solid var(--p1);}
+.gc-names{font-size:.85rem;margin-bottom:6px;color:var(--text);}
+.gc-meta{font-size:.75rem;color:var(--muted);}
+.gc-del{position:absolute;top:10px;right:10px;background:transparent;border:none;color:#445;
+  cursor:pointer;font-size:.9rem;padding:2px 6px;border-radius:3px;}
+.gc-del:hover{background:rgba(255,82,82,.15);color:var(--red);}
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted);}
+.empty-state .big{font-size:3rem;margin-bottom:12px;}
+.empty-state p{font-size:.9rem;line-height:1.6;}
+
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;
+  align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:28px;
+  width:100%;max-width:420px;position:relative;}
+.modal h3{font-size:1rem;color:var(--accent);margin-bottom:18px;letter-spacing:1px;}
+.modal-close{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--muted);
+  font-size:1.2rem;cursor:pointer;}
+.modal-close:hover{color:var(--text);}
+label{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;margin-top:12px;}
+input[type=text],select{width:100%;background:var(--cell);border:1px solid var(--border);color:var(--text);
+  padding:9px 12px;border-radius:6px;font-size:.95rem;outline:none;}
+input[type=text]:focus,select:focus{border-color:var(--accent);}
+.btn-row{display:flex;gap:8px;margin-top:18px;}
+.btn-a{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:10px 20px;
+  font-size:.9rem;font-weight:700;cursor:pointer;flex:1;}
+.btn-a:hover{opacity:.85;}
+.btn-b{background:var(--border);color:var(--text);border:none;border-radius:6px;padding:10px 16px;
+  font-size:.9rem;cursor:pointer;}
+.modal-status{font-size:.8rem;color:var(--muted);margin-top:10px;min-height:18px;}
+.modal-status.err{color:var(--red);}
+.modal-status.ok{color:var(--green);}
+.room-code-big{font-size:2rem;font-weight:900;letter-spacing:6px;color:var(--accent);
+  background:var(--cell);border-radius:6px;padding:10px;text-align:center;margin:10px 0;border:1px solid var(--border);}
+.tabs{display:flex;gap:0;margin-bottom:18px;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.tab{flex:1;padding:9px;text-align:center;cursor:pointer;background:var(--cell);color:var(--muted);
+  font-size:.88rem;font-weight:600;border:none;}
+.tab.active{background:var(--accent);color:#fff;}
+</style>
+</head>
+<body>
+<nav>
+  <a href="lobby.html" class="active">🏠 Lobby</a>
+  <a href="index.html">▶ Real-time</a>
+  <a href="attack-zones.html">⚔ Attack Zones</a>
+  <a href="rules.html">📖 Rules</a>
+  <a href="crypto-demo.html">🔐 Crypto</a>
+  <a href="audit.html">📋 Audit</a>
+</nav>
+<div class="page">
+
+  <!-- IDENTITY -->
+  <div class="identity-bar">
+    <div class="id-avatar" id="id-avatar">?</div>
+    <div class="id-info">
+      <div class="id-name" id="id-name-display">Loading...</div>
+      <div class="id-code">Device ID: <span id="id-code-display">...</span></div>
+    </div>
+    <button class="id-edit" onclick="openEditName()">✏ Name</button>
+    <button class="id-share-btn" id="id-copy-btn" onclick="copyDeviceId()">📋 Copy ID</button>
+  </div>
+
+  <!-- GAMES -->
+  <div class="games-header">
+    <h2>Your Games <span id="game-count" style="color:var(--muted)">(0/5)</span></h2>
+    <button class="new-btn" onclick="openNewGame()">+ New Game</button>
+  </div>
+  <div class="game-grid" id="game-grid">
+    <div class="empty-state">
+      <div class="big">♟</div>
+      <p>No active games.<br>Create one or join with a room code.</p>
+    </div>
+  </div>
+
+</div><!-- .page -->
+
+<!-- ─── NEW GAME MODAL ─── -->
+<div class="modal-bg" id="modal-new">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-new')">✕</button>
+    <h3>Start or Join a Game</h3>
+    <div class="tabs">
+      <button class="tab active" id="tab-create" onclick="switchTab('create')">Create</button>
+      <button class="tab" id="tab-join" onclick="switchTab('join')">Join</button>
+    </div>
+
+    <!-- CREATE -->
+    <div id="pane-create">
+      <label>Board Size</label>
+      <select id="new-size">
+        <option value="4" selected>4×4 — Quick (4 pieces each)</option>
+        <option value="6">6×6 — Standard (8 pieces each)</option>
+        <option value="8">8×8 — Full (16 pieces each)</option>
+      </select>
+      <div id="created-code-area" style="display:none">
+        <label>Share this code with your opponent</label>
+        <div class="room-code-big" id="created-code">—</div>
+        <p style="font-size:.8rem;color:var(--muted);">Waiting for opponent to join...</p>
+      </div>
+      <div class="btn-row">
+        <button class="btn-a" id="btn-create" onclick="createGame()">Create Game</button>
+        <button class="btn-b" onclick="closeModal('modal-new')">Cancel</button>
+      </div>
+      <div class="modal-status" id="create-status"></div>
+    </div>
+
+    <!-- JOIN -->
+    <div id="pane-join" style="display:none">
+      <label>Room Code</label>
+      <input type="text" id="join-code-input" placeholder="e.g. AB3X9K" maxlength="8" style="text-transform:uppercase;letter-spacing:4px;font-size:1.2rem;text-align:center;" />
+      <div class="btn-row">
+        <button class="btn-a" onclick="joinGame()">Join</button>
+        <button class="btn-b" onclick="closeModal('modal-new')">Cancel</button>
+      </div>
+      <div class="modal-status" id="join-status"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── EDIT NAME MODAL ─── -->
+<div class="modal-bg" id="modal-name">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-name')">✕</button>
+    <h3>Your Display Name</h3>
+    <label>Name (shown to opponents)</label>
+    <input type="text" id="name-input" maxlength="24" />
+    <div class="btn-row">
+      <button class="btn-a" onclick="saveName()">Save</button>
+      <button class="btn-b" onclick="closeModal('modal-name')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── IDENTITY INIT ────────────────────────────────────────────────────────────
+let myDeviceId, myName, myKeyPair;
+
+async function initIdentity() {
+  myDeviceId = getDeviceId();
+  myName = getDisplayName();
+  myKeyPair = await getKeyPair();
+
+  document.getElementById('id-avatar').textContent = (myName[0] || '?').toUpperCase();
+  document.getElementById('id-name-display').textContent = myName;
+  document.getElementById('id-code-display').textContent = myDeviceId.slice(0,8) + '...' + myDeviceId.slice(-4);
+}
+
+function copyDeviceId() {
+  navigator.clipboard.writeText(myDeviceId).then(() => {
+    const btn = document.getElementById('id-copy-btn');
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 Copy ID'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function openEditName() {
+  document.getElementById('name-input').value = myName;
+  openModal('modal-name');
+}
+
+function saveName() {
+  const name = document.getElementById('name-input').value.trim() || 'Player';
+  setDisplayName(name);
+  myName = name;
+  document.getElementById('id-name-display').textContent = name;
+  document.getElementById('id-avatar').textContent = name[0].toUpperCase();
+  closeModal('modal-name');
+}
+
+// ─── GAMES ────────────────────────────────────────────────────────────────────
+function genCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length:6}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+}
+
+async function refreshGames() {
+  const codes = getActiveGames();
+  document.getElementById('game-count').textContent = `(${codes.length}/5)`;
+  const grid = document.getElementById('game-grid');
+  grid.innerHTML = '';
+
+  if (codes.length === 0) {
+    grid.innerHTML = `<div class="empty-state"><div class="big">♟</div><p>No active games.<br>Create one or join with a room code.</p></div>`;
+    return;
+  }
+
+  for (const code of codes) {
+    const card = await buildGameCard(code);
+    grid.appendChild(card);
+  }
+}
+
+async function buildGameCard(code) {
+  const card = document.createElement('div');
+  card.className = 'game-card';
+  card.innerHTML = `<div class="gc-top"><span class="gc-code">${code}</span><span class="gc-badge badge-waiting">loading...</span></div>
+    <div class="gc-names">Loading game data...</div>
+    <div class="gc-meta"></div>
+    <button class="gc-del" title="Remove from list" onclick="event.stopPropagation();removeGame('${code}')">✕</button>`;
+
+  card.addEventListener('click', () => openGame(code));
+
+  // Load blob async
+  blobRead(asyncBlobName(code)).then(blob => {
+    if (!blob) {
+      card.querySelector('.gc-badge').className = 'gc-badge badge-done';
+      card.querySelector('.gc-badge').textContent = 'not found';
+      card.querySelector('.gc-names').textContent = 'Game data missing';
+      return;
+    }
+    const myTeam = blob.players.findIndex(p => p?.deviceId === myDeviceId);
+    const isMyTurn = blob.phase !== 'FINAL' && blob.phase !== 'WAITING'
+      && blob.currentTeam === myTeam;
+    const p1name = blob.players[0]?.name || '?';
+    const p2name = blob.players[1]?.name || 'Waiting...';
+
+    let badgeClass, badgeText;
+    if (blob.phase === 'FINAL') { badgeClass='badge-done'; badgeText='Finished'; }
+    else if (blob.phase === 'WAITING') { badgeClass='badge-waiting-player'; badgeText='Waiting for opponent'; }
+    else if (isMyTurn) { badgeClass='badge-myturn'; badgeText='Your turn!'; }
+    else { badgeClass='badge-waiting'; badgeText='Their turn'; }
+
+    card.className = 'game-card ' + (blob.phase==='FINAL'?'done':isMyTurn?'my-turn':blob.phase==='WAITING'?'waiting':'');
+    card.querySelector('.gc-badge').className = 'gc-badge ' + badgeClass;
+    card.querySelector('.gc-badge').textContent = badgeText;
+    card.querySelector('.gc-names').textContent = `${p1name} vs ${p2name}`;
+    card.querySelector('.gc-meta').textContent = `${blob.boardSize}×${blob.boardSize} · Turn ${blob.turnNumber} · ${blob.phase}`;
+  }).catch(() => {
+    card.querySelector('.gc-badge').textContent = 'error';
+  });
+
+  return card;
+}
+
+function openGame(code) {
+  window.location.href = `async.html?game=${code}`;
+}
+
+function removeGame(code) {
+  removeActiveGame(code);
+  refreshGames();
+}
+
+// ─── CREATE / JOIN ────────────────────────────────────────────────────────────
+let creatingCode = null;
+
+async function createGame() {
+  const size = parseInt(document.getElementById('new-size').value);
+  const code = genCode();
+  const btn = document.getElementById('btn-create');
+  const status = document.getElementById('create-status');
+  btn.disabled = true;
+  status.textContent = 'Creating...';
+
+  try {
+    await asyncCreateGame(code, size, myDeviceId, myName, myKeyPair.publicKeyB64);
+    addActiveGame(code);
+    creatingCode = code;
+    document.getElementById('created-code').textContent = code;
+    document.getElementById('created-code-area').style.display = '';
+    btn.style.display = 'none';
+    status.textContent = '';
+    status.className = 'modal-status ok';
+    // Poll until player 2 joins
+    pollForJoin(code);
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+    status.className = 'modal-status err';
+    btn.disabled = false;
+  }
+}
+
+async function pollForJoin(code) {
+  for (let i = 0; i < 120; i++) { // poll for up to 10 min
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const blob = await asyncLoadGame(code);
+      if (blob?.players[1]) {
+        closeModal('modal-new');
+        openGame(code);
+        return;
+      }
+    } catch {}
+  }
+}
+
+async function joinGame() {
+  const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+  const status = document.getElementById('join-status');
+  if (!code || code.length < 4) { status.textContent = 'Enter a valid room code'; status.className='modal-status err'; return; }
+  status.textContent = 'Joining...'; status.className = 'modal-status';
+
+  try {
+    await asyncJoinGame(code, myDeviceId, myName, myKeyPair.publicKeyB64);
+    addActiveGame(code);
+    closeModal('modal-new');
+    openGame(code);
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+    status.className = 'modal-status err';
+  }
+}
+
+// ─── MODALS ───────────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openNewGame() {
+  document.getElementById('created-code-area').style.display='none';
+  document.getElementById('btn-create').style.display='';
+  document.getElementById('btn-create').disabled=false;
+  document.getElementById('create-status').textContent='';
+  openModal('modal-new');
+}
+function switchTab(tab) {
+  document.getElementById('pane-create').style.display = tab==='create' ? '' : 'none';
+  document.getElementById('pane-join').style.display = tab==='join' ? '' : 'none';
+  document.getElementById('tab-create').className = 'tab ' + (tab==='create'?'active':'');
+  document.getElementById('tab-join').className   = 'tab ' + (tab==='join'?'active':'');
+}
+document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => { if(e.target===m) closeModal(m.id); }));
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────────
+initIdentity().then(() => refreshGames());
+// Refresh every 30s
+setInterval(refreshGames, 30000);
+</script>
+</body>
+</html>
