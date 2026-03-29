@@ -111,13 +111,24 @@ window.__debug = (() => {
     </div>
     <div id="dbg-body"></div>
   `;
-  document.body.appendChild(panel);
+  // Defer DOM injection until body is ready
+  function injectPanel() {
+    if (document.body) {
+      document.body.appendChild(panel);
+      document.body.appendChild(toggleBtn);
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.body.appendChild(panel);
+        document.body.appendChild(toggleBtn);
+      });
+    }
+  }
 
   const toggleBtn = document.createElement('button');
   toggleBtn.id = 'dbg-toggle-btn';
   toggleBtn.textContent = '⚙ DBG';
   toggleBtn.onclick = () => toggle();
-  document.body.appendChild(toggleBtn);
+  injectPanel();
 
   let currentTab = 'state';
 

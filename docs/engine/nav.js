@@ -74,6 +74,9 @@ function buildNav() {
   <span id="version-badge" style="margin-left:auto;font-size:.75rem;font-family:monospace;padding:4px 10px;"></span>
 `;
 
+  // Trigger version ticker now that the badge span exists
+  if (typeof startVersionTicker === 'function') startVersionTicker();
+
   // Ensure nav CSS exists (inject if missing)
   if (!document.getElementById('nav-css')) {
     const style = document.createElement('style');

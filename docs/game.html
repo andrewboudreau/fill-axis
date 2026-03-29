@@ -12,6 +12,7 @@
 <script src="engine/game.js"></script>
 <script src="engine/async-game.js"></script>
 <script src="engine/debug.js"></script>
+<script src="engine/bot.js"></script>
 <style>
 :root{--bg:#1a1a2e;--panel:#16213e;--border:#0f3460;--accent:#e94560;--p1:#4fc3f7;--p1bg:rgba(79,195,247,.1);
   --p2:#ff8a65;--p2bg:rgba(255,138,101,.1);--green:#69f0ae;--yellow:#ffd54f;--red:#ff5252;
@@ -126,7 +127,11 @@ button:hover{opacity:.83;}
 const params = new URLSearchParams(location.search);
 const GAME_CODE = (params.get('game') || '').toUpperCase();
 if (!GAME_CODE) { location.href = 'lobby.html'; }
-document.getElementById('nav-code').textContent = GAME_CODE;
+// nav-code is injected by nav.js — set it after DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const nc = document.getElementById('nav-code');
+  if (nc) nc.textContent = GAME_CODE;
+});
 
 const PIECE_TYPES_DATA = {
   KING:  { icon:'♛', name:'General',    desc:'Cross (+4)' },
@@ -189,11 +194,37 @@ function renderPhase() {
   document.getElementById('game-ui').style.display = 'none';
   renderMoveHistory();
 
-  if (phase === 'WAITING')    return phaseWaiting();
-  if (phase === 'PLACEMENT')  return phasePlacement();
-  if (phase === 'COMMITTED')  return phaseCommitted();
-  if (phase === 'REVEALED')   return phaseRevealed();
-  if (phase === 'FINAL')      return phaseFinal();
+  if (phase === 'WAITING')    { phaseWaiting(); }
+  else if (phase === 'PLACEMENT')  { phasePlacement(); maybeBotAct(); }
+  else if (phase === 'COMMITTED')  { phaseCommitted(); maybeBotReveal(); }
+  else if (phase === 'REVEALED')   { phaseRevealed(); }
+  else if (phase === 'FINAL')      { phaseFinal(); }
+}
+
+// ─── BOT HOOKS ────────────────────────────────────────────────────────────────
+function maybeBotAct() {
+  if (!window.BOT_ACTIVE) return;
+  if (blob.currentTeam !== myTeam) return;
+  if (blob.players[myTeam]?.commitment) return;
+  setTimeout(async () => {
+    const acted = await botTakeTurn();
+    if (acted) {
+      renderBoard(blob.boardSize, localState.tilesPlaced < localState.tilesPerTurn);
+      renderTrays(blob.boardSize);
+      renderScores();
+      renderPlacementActions(true, localState.tilesPerTurn);
+      // If quota used, auto end turn
+      if (localState.tilesPlaced >= localState.tilesPerTurn) {
+        setTimeout(() => endPlacementTurn(), BOT_DELAY);
+      }
+    }
+  }, BOT_DELAY);
+}
+
+function maybeBotReveal() {
+  if (!window.BOT_ACTIVE) return;
+  if (blob.players[myTeam]?.revealedPieces) return;
+  setTimeout(() => botAutoReveal(), BOT_DELAY);
 }
 
 // ─── WAITING ─────────────────────────────────────────────────────────────────

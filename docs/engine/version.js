@@ -3,8 +3,8 @@
 // Update BUILD_TIME on every release (UTC ISO string).
 // Inject <div id="version-badge"></div> anywhere in the page to get the badge.
 
-const VERSION = '0.5.1';
-const BUILD_TIME = '2026-03-29T19:29:15Z';  // updated each release
+const VERSION = '0.5.2';
+const BUILD_TIME = '2026-03-29T19:39:55Z';  // updated each release
 
 function timeAgo(isoStr) {
   const then = new Date(isoStr).getTime();
@@ -38,17 +38,32 @@ function renderVersionBadge() {
     `<span id="version-ago" style="color:var(--muted,#778);" title="${dateStr}">baked ${ago}</span>`;
 }
 
-// Tick every 5 seconds
+// Tick every 5 seconds — also called by nav.js after it injects the badge span
+function startVersionTicker() {
+  renderVersionBadge();
+  if (window._versionTickerRunning) return;
+  window._versionTickerRunning = true;
+  setInterval(() => {
+    const agoEl = document.getElementById('version-ago');
+    if (agoEl) {
+      agoEl.textContent = 'baked ' + timeAgo(BUILD_TIME);
+      agoEl.title = new Date(BUILD_TIME).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+    }
+  }, 5000);
+}
+
+// Initial render — retry a few times to handle nav.js async injection
 (function init() {
-  document.addEventListener('DOMContentLoaded', () => {
-    renderVersionBadge();
-    setInterval(() => {
-      const agoEl = document.getElementById('version-ago');
-      if (agoEl) {
-        const d = new Date(BUILD_TIME);
-        agoEl.textContent = 'baked ' + timeAgo(BUILD_TIME);
-        agoEl.title = d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
-      }
-    }, 5000);
-  });
+  function tryRender(attempts) {
+    if (document.getElementById('version-badge')) {
+      startVersionTicker();
+    } else if (attempts > 0) {
+      setTimeout(() => tryRender(attempts - 1), 100);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => tryRender(10));
+  } else {
+    tryRender(10);
+  }
 })();
