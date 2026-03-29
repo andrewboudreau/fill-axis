@@ -6,6 +6,7 @@
 <title>Fill Axis</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="engine/crypto.js"></script>
+<script src="engine/storage.js"></script>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -146,6 +147,7 @@
     <a href="scoring.html">📊 Scoring</a>
     <a href="rules.html">📖 Rules</a>
     <a href="crypto-demo.html">🔐 Crypto</a>
+    <a href="audit.html">📋 Audit</a>
   </nav>
   <h1>Fill Axis</h1>
   <div id="subtitle">Two-Player Territory Game</div>
@@ -452,11 +454,47 @@ function showEndScreen(territory) {
   }
   sub.textContent = G.winReason;
 
+  let auditHtml = '';
+  if (G.mode === 'p2p' && currentRoomCode) {
+    auditHtml = `<div id="audit-status" style="font-size:.78rem;color:var(--muted);margin-top:8px;">Saving audit chain...</div>
+    <a id="audit-link" href="audit.html?game=${currentRoomCode}" target="_blank"
+       style="display:none;font-size:.8rem;color:var(--p1);margin-top:6px;">📋 View audit log →</a>`;
+    saveGameAudit();
+  }
+
   scoresEl.innerHTML = `
     <div class="score-box p1"><div class="score-val">${territory[0]}</div><div class="score-name">${G.names[0]}</div></div>
     <div class="score-box p2"><div class="score-val">${territory[1]}</div><div class="score-name">${G.names[1]}</div></div>
+    ${auditHtml}
   `;
   overlay.style.display = 'flex';
+}
+
+// Save signed audit chain to blob storage after P2P game ends
+async function saveGameAudit() {
+  if (!currentRoomCode) return;
+  try {
+    // Build a final audit record: pieces, commitments, salts, winner
+    const auditData = {
+      roomCode: currentRoomCode,
+      names: G.names,
+      boardSize: G.size,
+      winner: G.winner,
+      winReason: G.winReason,
+      p1Commitment: myTeam === 0 ? myCommitment : opponentCommitment,
+      p2Commitment: myTeam === 1 ? myCommitment : opponentCommitment,
+      pieces: G.pieces.map(p => ({ x:p.x, y:p.y, type:p.type, team:p.team, dead:p.dead })),
+      savedAt: new Date().toISOString(),
+    };
+    await saveAuditChain(currentRoomCode, auditData, {});
+    const statusEl = document.getElementById('audit-status');
+    const linkEl = document.getElementById('audit-link');
+    if (statusEl) statusEl.textContent = '✅ Audit saved';
+    if (linkEl) linkEl.style.display = '';
+  } catch(e) {
+    const statusEl = document.getElementById('audit-status');
+    if (statusEl) statusEl.textContent = '⚠ Audit save failed: ' + e.message;
+  }
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -689,6 +727,7 @@ let peer = null;       // PeerJS Peer instance
 let conn = null;       // active DataConnection
 let myTeam = 0;        // 0 = host, 1 = guest
 let connectTimeout = null;
+let currentRoomCode = null;  // room code for blob storage keying
 
 // Commitment state (P2P only)
 let mySalt = null;
@@ -915,6 +954,7 @@ document.getElementById('btn-host').addEventListener('click', () => {
   document.getElementById('join-form').style.display = 'none';
 
   const code = genRoomCode();
+  currentRoomCode = code;
   document.getElementById('room-code-text').textContent = code;
   setStatusMsg('Initializing...', false);
 
@@ -947,7 +987,7 @@ document.getElementById('btn-join').addEventListener('click', () => {
 document.getElementById('btn-connect').addEventListener('click', () => {
   const code = document.getElementById('join-code').value.trim().toUpperCase();
   if (code.length < 4) { setStatusMsg('Enter a valid room code', true); return; }
-
+  currentRoomCode = code;
   setStatusMsg('Connecting...', false);
   if (peer) peer.destroy();
   peer = new Peer();

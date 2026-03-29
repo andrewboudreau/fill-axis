@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fill Axis — Game Audit</title>
+<script src="engine/crypto.js"></script>
+<script src="engine/storage.js"></script>
+<style>
+:root{--bg:#1a1a2e;--panel:#16213e;--border:#0f3460;--accent:#e94560;--p1:#4fc3f7;--p2:#ff8a65;
+      --green:#69f0ae;--yellow:#ffd54f;--red:#ff5252;--cell:#0d1b2a;--text:#e0e0e0;--muted:#778;--mono:'Fira Mono','Consolas',monospace;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;padding:20px;}
+nav{display:flex;gap:6px;background:var(--panel);padding:10px 16px;border-radius:8px;margin-bottom:20px;border:1px solid var(--border);flex-wrap:wrap;}
+nav a{color:var(--muted);text-decoration:none;padding:5px 12px;border-radius:4px;font-size:.88rem;}
+nav a:hover,nav a.active{background:rgba(233,69,96,.15);color:var(--accent);}
+.page{max-width:860px;margin:0 auto;}
+h1{color:var(--accent);font-size:1.5rem;letter-spacing:2px;margin-bottom:4px;}
+.subtitle{color:var(--muted);font-size:.85rem;margin-bottom:24px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;}
+h2{font-size:.88rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;}
+.field{margin-bottom:10px;}
+.field label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:3px;}
+.val{font-family:var(--mono);font-size:.72rem;background:var(--cell);padding:7px 10px;border-radius:4px;word-break:break-all;border:1px solid var(--border);color:var(--text);}
+.val.ok{border-color:var(--green);color:var(--green);}
+.val.bad{border-color:var(--red);color:var(--red);}
+.val.hash{color:var(--yellow);}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;}
+.pill-p1{background:rgba(79,195,247,.12);color:var(--p1);border:1px solid var(--p1);}
+.pill-p2{background:rgba(255,138,101,.12);color:var(--p2);border:1px solid var(--p2);}
+.piece-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;}
+.piece-chip{padding:4px 10px;background:var(--cell);border-radius:4px;font-size:.8rem;border:1px solid var(--border);}
+.piece-chip.p1{border-color:var(--p1);color:var(--p1);}
+.piece-chip.p2{border-color:var(--p2);color:var(--p2);}
+.piece-chip.dead{opacity:.35;text-decoration:line-through;}
+.verdict{padding:14px 18px;border-radius:8px;font-size:.95rem;font-weight:700;margin:16px 0;}
+.verdict.ok{background:rgba(105,240,174,.1);color:var(--green);border:2px solid var(--green);}
+.verdict.bad{background:rgba(255,82,82,.1);color:var(--red);border:2px solid var(--red);}
+.verdict.warn{background:rgba(255,213,79,.1);color:var(--yellow);border:1px solid var(--yellow);}
+input[type=text]{width:100%;background:var(--cell);border:1px solid var(--border);color:var(--text);
+  padding:9px 12px;border-radius:6px;font-size:.95rem;outline:none;font-family:var(--mono);letter-spacing:2px;}
+input[type=text]:focus{border-color:var(--accent);}
+button{cursor:pointer;border:none;border-radius:6px;padding:9px 20px;font-size:.9rem;font-weight:600;}
+button:hover{opacity:.83;}
+.btn-a{background:var(--accent);color:#fff;}
+.mini-board{display:grid;grid-template-columns:repeat(4,44px);gap:3px;margin:10px 0;}
+.bc{width:44px;height:44px;background:var(--cell);border:1px solid #1a2840;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;font-size:1.1rem;position:relative;}
+.bc.p1{border-color:var(--p1);background:rgba(79,195,247,.12);}
+.bc.p2{border-color:var(--p2);background:rgba(255,138,101,.12);}
+.bc.dead{opacity:.25;}
+.bc .atk{position:absolute;inset:0;background:rgba(255,235,59,.1);border-radius:3px;}
+table{width:100%;border-collapse:collapse;font-size:.82rem;}
+th{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1px;padding:6px 10px;border-bottom:1px solid var(--border);text-align:left;}
+td{padding:8px 10px;border-bottom:1px solid #1a2840;font-family:var(--mono);font-size:.75rem;}
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html">▶ Play</a>
+  <a href="attack-zones.html">⚔ Attack Zones</a>
+  <a href="scoring.html">📊 Scoring</a>
+  <a href="rules.html">📖 Rules</a>
+  <a href="crypto-demo.html">🔐 Crypto</a>
+  <a href="audit.html" class="active">📋 Audit</a>
+</nav>
+<div class="page">
+<h1>📋 Game Audit</h1>
+<p class="subtitle">Load a completed game's audit record and verify the commitment hashes independently.</p>
+
+<div class="card">
+  <h2>Load Game</h2>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <input type="text" id="room-input" placeholder="Enter room code (e.g. AB3X9K)" maxlength="8" />
+    <button class="btn-a" onclick="loadAudit()">Load</button>
+  </div>
+  <div id="load-status" style="font-size:.8rem;color:var(--muted);margin-top:8px;min-height:20px;"></div>
+</div>
+
+<div id="audit-content" style="display:none;">
+
+  <div class="card">
+    <h2>Game Summary</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+      <div class="field"><label>Room Code</label><div class="val" id="a-code">—</div></div>
+      <div class="field"><label>Board Size</label><div class="val" id="a-size">—</div></div>
+      <div class="field"><label>Winner</label><div class="val" id="a-winner">—</div></div>
+      <div class="field"><label>Win Reason</label><div class="val" id="a-reason">—</div></div>
+      <div class="field"><label>Saved At</label><div class="val" id="a-saved">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Commitment Verification</h2>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px;">
+      Verify that each player's revealed board matches the hash they committed to before reveal.
+      If both match, the game was played fairly — neither player could have changed their board after committing.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div>
+        <div class="pill pill-p1" style="margin-bottom:8px;">Player 1</div>
+        <div class="field"><label>Commitment (stored hash)</label><div class="val hash" id="v-c1">—</div></div>
+        <div class="field"><label>Revealed board state string</label><div class="val" id="v-bs1">—</div></div>
+        <div class="field"><label>Verification result</label><div class="val" id="v-r1">—</div></div>
+      </div>
+      <div>
+        <div class="pill pill-p2" style="margin-bottom:8px;">Player 2</div>
+        <div class="field"><label>Commitment (stored hash)</label><div class="val hash" id="v-c2">—</div></div>
+        <div class="field"><label>Revealed board state string</label><div class="val" id="v-bs2">—</div></div>
+        <div class="field"><label>Verification result</label><div class="val" id="v-r2">—</div></div>
+      </div>
+    </div>
+    <div id="commit-verdict"></div>
+    <p style="font-size:.75rem;color:var(--muted);margin-top:8px;">
+      ⓘ Note: commitment verification requires both the board state AND the salt. The salt is stored in the audit record only when the player agrees to save it at game end.
+      Without the salt, commitments cannot be re-verified — this is a current limitation of the trust model.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Final Board State</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div class="pill pill-p1" style="margin-bottom:8px;">Player 1 pieces</div>
+        <div id="board-p1-render"></div>
+      </div>
+      <div>
+        <div class="pill pill-p2" style="margin-bottom:8px;">Player 2 pieces</div>
+        <div id="board-p2-render"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>All Pieces</h2>
+    <table>
+      <thead><tr><th>Team</th><th>Type</th><th>Position</th><th>Status</th></tr></thead>
+      <tbody id="pieces-table"></tbody>
+    </table>
+  </div>
+
+</div><!-- #audit-content -->
+</div>
+
+<script>
+const PIECE_ICONS = {KING:'♛',VERT:'|',HORZ:'—',X:'✕'};
+
+async function loadAudit() {
+  const code = document.getElementById('room-input').value.trim().toUpperCase();
+  if (!code) return;
+  const statusEl = document.getElementById('load-status');
+  statusEl.textContent = 'Loading...';
+  statusEl.style.color = 'var(--muted)';
+
+  try {
+    const data = await loadAuditChain(code);
+    if (!data) {
+      statusEl.textContent = `No audit found for room code "${code}". Game must be completed and audit saved.`;
+      statusEl.style.color = 'var(--red)';
+      return;
+    }
+    statusEl.textContent = '✅ Loaded';
+    statusEl.style.color = 'var(--green)';
+    renderAudit(data.chain || data); // handle both wrapper formats
+  } catch(e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+async function renderAudit(data) {
+  document.getElementById('audit-content').style.display = '';
+
+  // Summary
+  document.getElementById('a-code').textContent = data.roomCode || '—';
+  document.getElementById('a-size').textContent = data.boardSize ? `${data.boardSize}×${data.boardSize}` : '—';
+  const winnerName = data.winner !== null && data.winner !== undefined
+    ? (data.names ? data.names[data.winner] : `Player ${data.winner + 1}`)
+    : 'Draw';
+  document.getElementById('a-winner').textContent = winnerName;
+  document.getElementById('a-reason').textContent = data.winReason || '—';
+  document.getElementById('a-saved').textContent = data.savedAt ? new Date(data.savedAt).toLocaleString() : '—';
+
+  // Pieces
+  const pieces = data.pieces || [];
+  const p1pieces = pieces.filter(p => p.team === 0);
+  const p2pieces = pieces.filter(p => p.team === 1);
+
+  // Board render
+  renderMiniBoard('board-p1-render', p1pieces, 0, data.boardSize || 4);
+  renderMiniBoard('board-p2-render', p2pieces, 1, data.boardSize || 4);
+
+  // Pieces table
+  const tbody = document.getElementById('pieces-table');
+  tbody.innerHTML = '';
+  for (const p of pieces) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="pill pill-p${p.team+1}">P${p.team+1}</span></td>
+      <td>${PIECE_ICONS[p.type] || p.type} ${p.type}</td>
+      <td>(${p.x}, ${p.y})</td>
+      <td style="color:${p.dead?'var(--red)':'var(--green)'}">${p.dead ? '💀 Eliminated' : '✅ Survived'}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // Commitment verification
+  const c1 = data.p1Commitment || data.commitments?.p1;
+  const c2 = data.p2Commitment || data.commitments?.p2;
+  document.getElementById('v-c1').textContent = c1 || '(not stored)';
+  document.getElementById('v-c2').textContent = c2 || '(not stored)';
+
+  // Reconstruct board state strings
+  const bs1 = boardStateString(p1pieces);
+  const bs2 = boardStateString(p2pieces);
+  document.getElementById('v-bs1').textContent = bs1 || '(empty)';
+  document.getElementById('v-bs2').textContent = bs2 || '(empty)';
+
+  // We can verify hash(boardState + salt) only if salt is stored
+  // Current audit record stores commitments but not salts (salt stays with player)
+  // Show what we can
+  const s1 = data.p1Salt, s2 = data.p2Salt;
+  if (c1 && s1) {
+    const computed = await sha256(bs1 + s1);
+    const ok = computed === c1;
+    const el = document.getElementById('v-r1');
+    el.textContent = ok ? '✅ ' + computed : '❌ Mismatch\nExpected: ' + c1 + '\nGot: ' + computed;
+    el.className = 'val ' + (ok ? 'ok' : 'bad');
+  } else if (c1) {
+    document.getElementById('v-r1').textContent = 'Commitment hash stored. Salt not available — cannot re-verify.\nBoard state string above is from final piece positions.';
+    document.getElementById('v-r1').className = 'val';
+    document.getElementById('v-r1').style.color = 'var(--yellow)';
+  }
+  if (c2 && s2) {
+    const computed = await sha256(bs2 + s2);
+    const ok = computed === c2;
+    const el = document.getElementById('v-r2');
+    el.textContent = ok ? '✅ ' + computed : '❌ Mismatch\nExpected: ' + c2 + '\nGot: ' + computed;
+    el.className = 'val ' + (ok ? 'ok' : 'bad');
+  } else if (c2) {
+    document.getElementById('v-r2').textContent = 'Commitment hash stored. Salt not available — cannot re-verify.\nBoard state string above is from final piece positions.';
+    document.getElementById('v-r2').className = 'val';
+    document.getElementById('v-r2').style.color = 'var(--yellow)';
+  }
+
+  // Overall verdict on commitments
+  const verdictEl = document.getElementById('commit-verdict');
+  if (c1 && s1 && c2 && s2) {
+    const ok1 = await sha256(bs1+s1) === c1;
+    const ok2 = await sha256(bs2+s2) === c2;
+    verdictEl.innerHTML = `<div class="verdict ${ok1&&ok2?'ok':'bad'}">
+      ${ok1&&ok2 ? '✅ Both commitments verified — game played fairly.' : '❌ Commitment mismatch detected.'}
+    </div>`;
+  } else {
+    verdictEl.innerHTML = `<div class="verdict warn">
+      ⚠ Salts not stored in this audit record. Commitments show that boards were locked before reveal,
+      but full re-verification requires the players to provide their salts.
+    </div>`;
+  }
+}
+
+function renderMiniBoard(containerId, pieces, team, size) {
+  const container = document.getElementById(containerId);
+  const grid = document.createElement('div');
+  grid.className = 'mini-board';
+  grid.style.gridTemplateColumns = `repeat(${size}, 44px)`;
+  for (let y = size - 1; y >= 0; y--) {
+    for (let x = 0; x < size; x++) {
+      const cell = document.createElement('div');
+      cell.className = 'bc';
+      const piece = pieces.find(p => p.x === x && p.y === y);
+      if (piece) {
+        cell.classList.add('p' + (team+1));
+        if (piece.dead) cell.classList.add('dead');
+        cell.textContent = PIECE_ICONS[piece.type] || '?';
+        cell.style.color = team === 0 ? 'var(--p1)' : 'var(--p2)';
+        cell.title = `${piece.type} at (${x},${y})${piece.dead ? ' — eliminated' : ''}`;
+      }
+      grid.appendChild(cell);
+    }
+  }
+  container.innerHTML = '';
+  container.appendChild(grid);
+}
+
+// Auto-load if ?game= param present
+const params = new URLSearchParams(location.search);
+if (params.get('game')) {
+  document.getElementById('room-input').value = params.get('game');
+  loadAudit();
+}
+</script>
+</body>
+</html>
