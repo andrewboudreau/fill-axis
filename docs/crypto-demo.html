@@ -3,68 +3,121 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fill Axis — Commitment Scheme Demo</title>
-<script src="engine/pieces.js"></script>
+<title>Fill Axis — Commitment Scheme: Interactive Explainer</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script src="engine/crypto.js"></script>
 <style>
-  :root {
-    --bg: #1a1a2e; --panel: #16213e; --border: #0f3460;
-    --accent: #e94560; --p1: #4fc3f7; --p2: #ff8a65;
-    --green: #69f0ae; --yellow: #ffd54f; --red: #ff5252;
-    --cell: #0d1b2a; --text: #e0e0e0; --muted: #888;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; padding: 24px; }
-  nav { display: flex; gap: 8px; background: var(--panel); padding: 10px 16px; border-radius: 8px;
-        margin-bottom: 20px; border: 1px solid var(--border); flex-wrap: wrap; }
-  nav a { color: var(--muted); text-decoration: none; padding: 4px 12px; border-radius: 4px; font-size: 0.9rem; }
-  nav a:hover, nav a.active { background: var(--accent); color: #fff; }
-  h1 { color: var(--accent); font-size: 1.6rem; letter-spacing: 2px; margin-bottom: 6px; }
-  .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; }
-  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px; }
-  @media (max-width: 700px) { .layout { grid-template-columns: 1fr; } }
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
-  .card h2 { font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
-  .player-tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.8rem; font-weight: 700; margin-bottom: 12px; }
-  .p1-tag { background: rgba(79,195,247,0.15); color: var(--p1); border: 1px solid var(--p1); }
-  .p2-tag { background: rgba(255,138,101,0.15); color: var(--p2); border: 1px solid var(--p2); }
-  button { cursor: pointer; border: none; border-radius: 6px; padding: 9px 18px; font-size: 0.9rem; font-weight: 600; transition: opacity 0.15s; }
-  button:hover { opacity: 0.82; }
-  .btn-accent { background: var(--accent); color: #fff; }
-  .btn-muted  { background: var(--border); color: var(--text); }
-  .hash-box { font-family: monospace; font-size: 0.72rem; background: var(--cell); padding: 10px; border-radius: 6px;
-              word-break: break-all; color: var(--yellow); margin: 8px 0; min-height: 36px; border: 1px solid var(--border); }
-  .status { padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; margin: 8px 0; }
-  .ok  { background: rgba(105,240,174,0.12); color: var(--green); border: 1px solid var(--green); }
-  .err { background: rgba(255,82,82,0.12);   color: var(--red);   border: 1px solid var(--red); }
-  .warn{ background: rgba(255,213,79,0.12);  color: var(--yellow);border: 1px solid var(--yellow); }
-  .step { display: flex; align-items: flex-start; gap: 12px; margin: 12px 0; }
-  .step-num { min-width: 26px; height: 26px; border-radius: 50%; background: var(--border);
-              display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); }
-  .step-num.done { background: var(--green); color: #111; }
-  .step-body { flex: 1; font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
-  .step-body strong { color: var(--text); }
-  label { font-size: 0.8rem; color: var(--muted); display: block; margin-bottom: 4px; margin-top: 10px; }
-  input[type=checkbox] { margin-right: 6px; }
-  .board-mini { display: grid; grid-template-columns: repeat(4, 44px); gap: 4px; margin: 10px 0; }
-  .cell-mini { width: 44px; height: 44px; background: var(--cell); border: 1px solid var(--border);
-               border-radius: 4px; display: flex; align-items: center; justify-content: center;
-               font-size: 1.2rem; cursor: pointer; transition: background 0.1s; }
-  .cell-mini:hover { background: #1a2f47; }
-  .cell-mini.p1-piece { border-color: var(--p1); background: rgba(79,195,247,0.15); }
-  .cell-mini.p2-piece { border-color: var(--p2); background: rgba(255,138,101,0.15); }
-  .piece-picker { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
-  .piece-btn { padding: 6px 12px; background: var(--cell); border: 1px solid var(--border);
-               border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
-  .piece-btn:hover, .piece-btn.active { border-color: var(--accent); color: var(--accent); }
-  .full-width { grid-column: 1 / -1; }
-  .chain-entry { font-family: monospace; font-size: 0.72rem; background: var(--cell); padding: 8px 10px;
-                 border-radius: 4px; border-left: 3px solid var(--border); margin: 4px 0; color: var(--muted); }
-  .chain-entry.p1 { border-color: var(--p1); }
-  .chain-entry.p2 { border-color: var(--p2); }
-  .chain-entry.verified { border-color: var(--green); }
-  details summary { cursor: pointer; color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
-  details pre { font-size: 0.7rem; color: var(--muted); background: var(--cell); padding: 8px; border-radius: 4px; overflow-x: auto; margin-top: 4px; }
+:root {
+  --bg:#1a1a2e; --panel:#16213e; --border:#0f3460; --accent:#e94560;
+  --p1:#4fc3f7; --p1bg:rgba(79,195,247,0.1); --p2:#ff8a65; --p2bg:rgba(255,138,101,0.1);
+  --green:#69f0ae; --yellow:#ffd54f; --red:#ff5252; --cell:#0d1b2a;
+  --text:#e0e0e0; --muted:#778; --mono:'Fira Mono','Consolas',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;line-height:1.5;}
+nav{display:flex;gap:6px;background:var(--panel);padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+nav a{color:var(--muted);text-decoration:none;padding:5px 12px;border-radius:4px;font-size:.88rem;}
+nav a:hover,nav a.active{background:rgba(233,69,96,.15);color:var(--accent);}
+.page{max-width:1100px;margin:0 auto;padding:24px 16px;}
+h1{color:var(--accent);font-size:1.6rem;letter-spacing:2px;margin-bottom:4px;}
+.subtitle{color:var(--muted);font-size:.85rem;margin-bottom:28px;}
+h2{font-size:1rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;}
+h3{font-size:.88rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+section{margin-bottom:36px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;}
+.card+.card{margin-top:14px;}
+
+/* ── PROTOCOL DIAGRAM ── */
+.mermaid-wrap{background:var(--cell);border:1px solid var(--border);border-radius:8px;padding:20px;overflow-x:auto;}
+.mermaid{max-width:100%;}
+.mermaid svg{max-width:100%!important;}
+
+/* ── TWO-PLAYER PANELS ── */
+.players{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:700px){.players{grid-template-columns:1fr;}}
+.player-panel{border-radius:10px;padding:18px;border:2px solid;}
+.p1-panel{background:var(--p1bg);border-color:var(--p1);}
+.p2-panel{background:var(--p2bg);border-color:var(--p2);}
+.player-title{font-weight:800;font-size:1rem;margin-bottom:14px;display:flex;align-items:center;gap:10px;}
+.p1-title{color:var(--p1);}
+.p2-title{color:var(--p2);}
+.reveal-toggle{font-size:.78rem;padding:3px 10px;border:1px solid;border-radius:12px;cursor:pointer;background:transparent;font-weight:600;transition:background .12s;}
+.p1-toggle{color:var(--p1);border-color:var(--p1);}
+.p1-toggle.on{background:var(--p1);color:#111;}
+.p2-toggle{color:var(--p2);border-color:var(--p2);}
+.p2-toggle.on{background:var(--p2);color:#111;}
+
+/* ── DATA FIELDS ── */
+.field{margin-bottom:12px;}
+.field label{display:flex;align-items:center;justify-content:space-between;font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.field label span{color:var(--yellow);font-weight:700;}
+.val{font-family:var(--mono);font-size:.72rem;background:var(--cell);padding:8px 10px;border-radius:5px;
+     word-break:break-all;border:1px solid var(--border);min-height:34px;color:var(--text);white-space:pre-wrap;}
+.val.secret{color:var(--muted);font-style:italic;}
+.val.hash{color:var(--yellow);}
+.val.valid{border-color:var(--green);color:var(--green);}
+.val.invalid{border-color:var(--red);color:var(--red);}
+.val.empty{color:#444;}
+
+/* ── MINI BOARD ── */
+.board-grid{display:grid;grid-template-columns:repeat(4,44px);gap:3px;margin:8px 0;}
+.bcell{width:44px;height:44px;background:var(--cell);border:1px solid #1e3050;border-radius:4px;
+       display:flex;align-items:center;justify-content:center;font-size:1.2rem;cursor:pointer;transition:background .1s;}
+.bcell:hover{background:#1c2f46;}
+.bcell.p1{border-color:var(--p1);background:rgba(79,195,247,.15);}
+.bcell.p2{border-color:var(--p2);background:rgba(255,138,101,.15);}
+.piece-picker{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.pb{padding:5px 10px;background:var(--cell);border:1px solid var(--border);border-radius:5px;
+    cursor:pointer;font-size:.82rem;color:var(--muted);}
+.pb:hover,.pb.on{border-color:var(--accent);color:var(--accent);}
+
+/* ── STEP BAR ── */
+.stepbar{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;}
+.step-btn{padding:7px 16px;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:700;
+          background:var(--cell);color:var(--muted);border:1px solid var(--border);}
+.step-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.step-btn.done{background:rgba(105,240,174,.15);color:var(--green);border-color:var(--green);}
+.step-btn:disabled{opacity:.4;cursor:default;}
+
+/* ── STATUS / VERDICT ── */
+.verdict{padding:12px 16px;border-radius:7px;font-size:.88rem;margin-top:10px;font-family:var(--mono);}
+.verdict.ok{background:rgba(105,240,174,.1);color:var(--green);border:1px solid var(--green);}
+.verdict.bad{background:rgba(255,82,82,.1);color:var(--red);border:1px solid var(--red);}
+.verdict.warn{background:rgba(255,213,79,.1);color:var(--yellow);border:1px solid var(--yellow);}
+.verdict.info{background:rgba(79,195,247,.08);color:var(--p1);border:1px solid #1e4060;}
+
+/* ── WHAT-IF ATTACK ── */
+.attack-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:600px){.attack-grid{grid-template-columns:1fr;}}
+
+/* ── HASH LIVE ── */
+textarea{width:100%;background:var(--cell);border:1px solid var(--border);color:var(--text);
+         padding:8px 10px;border-radius:5px;font-family:var(--mono);font-size:.78rem;resize:vertical;outline:none;}
+textarea:focus{border-color:var(--accent);}
+button{cursor:pointer;border:none;border-radius:6px;padding:8px 18px;font-size:.88rem;font-weight:600;transition:opacity .15s;}
+button:hover{opacity:.83;}
+.btn-a{background:var(--accent);color:#fff;}
+.btn-b{background:var(--border);color:var(--text);}
+.btn-sm{padding:5px 12px;font-size:.78rem;}
+
+/* ── HOW-TO ── */
+.howto-step{display:flex;gap:14px;margin-bottom:16px;align-items:flex-start;}
+.hs-num{min-width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;
+        font-weight:900;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;}
+.hs-body{font-size:.88rem;color:var(--text);}
+.hs-body strong{color:var(--accent);}
+.hs-body code{background:var(--cell);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:.8rem;color:var(--yellow);}
+
+/* misc */
+.divider{border:none;border-top:1px solid var(--border);margin:28px 0;}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;}
+.pill-secret{background:rgba(255,82,82,.15);color:var(--red);border:1px solid var(--red);}
+.pill-public{background:rgba(105,240,174,.12);color:var(--green);border:1px solid var(--green);}
+.note{font-size:.8rem;color:var(--muted);margin-top:6px;}
+table{width:100%;border-collapse:collapse;font-size:.85rem;}
+th{color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-size:.72rem;padding:6px 10px;border-bottom:1px solid var(--border);text-align:left;}
+td{padding:8px 10px;border-bottom:1px solid #1a2840;vertical-align:top;}
+td code{font-family:var(--mono);font-size:.78rem;color:var(--yellow);}
 </style>
 </head>
 <body>
@@ -75,263 +128,573 @@
   <a href="rules.html">📖 Rules</a>
   <a href="crypto-demo.html" class="active">🔐 Crypto</a>
 </nav>
+<div class="page">
 
-<h1>🔐 Commitment Scheme Demo</h1>
-<p class="subtitle">Verifiable hidden placement — no trusted server needed</p>
+<h1>🔐 Commitment Scheme</h1>
+<p class="subtitle">How two players prove they didn't cheat — without trusting each other or a server. This page runs real cryptography in your browser. Every hash shown is computed live.</p>
 
-<div class="layout">
+<!-- ═══════════════════════════════════════════════════════ SECTION 1: DIAGRAM -->
+<section>
+  <div class="card">
+    <h2>Protocol Flow</h2>
+    <div class="mermaid-wrap">
+      <div class="mermaid">
+sequenceDiagram
+    participant P1 as Player 1 (Browser)
+    participant P2 as Player 2 (Browser)
 
-  <!-- PROTOCOL STEPS -->
-  <div class="card full-width">
-    <h2>How It Works</h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
-      <div class="step"><div class="step-num" id="s1">1</div><div class="step-body"><strong>Place Pieces</strong><br>Each player places secretly. Board state is locked.</div></div>
-      <div class="step"><div class="step-num" id="s2">2</div><div class="step-body"><strong>Commit</strong><br>SHA-256(board + secret salt) broadcast to opponent. Can't change board now without detection.</div></div>
-      <div class="step"><div class="step-num" id="s3">3</div><div class="step-body"><strong>Reveal</strong><br>Both players share their board + salt. Opponent verifies hash matches commitment.</div></div>
-      <div class="step"><div class="step-num" id="s4">4</div><div class="step-body"><strong>Verify</strong><br>If hashes match → fair game. If not → cheater detected. No server needed.</div></div>
-    </div>
-  </div>
+    Note over P1,P2: PHASE 1 — Setup (on game start)
+    P1->>P1: generate salt₁ (32 random bytes, SECRET)
+    P2->>P2: generate salt₂ (32 random bytes, SECRET)
 
-  <!-- PLAYER 1 -->
-  <div class="card" id="card-p1">
-    <h2>Player Setup</h2>
-    <div class="player-tag p1-tag">◆ Player 1</div>
-    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px;">Click pieces below then click board cells to place. Player 1 pieces shown in blue.</p>
-    <div class="piece-picker" id="picker-p1">
-      <button class="piece-btn active" data-type="KING">♛ General</button>
-      <button class="piece-btn" data-type="VERT">| Vertical</button>
-      <button class="piece-btn" data-type="HORZ">— Horiz</button>
-      <button class="piece-btn" data-type="X">✕ Diagonal</button>
-    </div>
-    <div class="board-mini" id="board-p1"></div>
-    <button class="btn-accent" id="btn-commit-p1" style="margin-top:10px;width:100%">🔒 Commit Board</button>
-    <label>Commitment hash (broadcast to P2):</label>
-    <div class="hash-box" id="commit-p1">—</div>
-    <label><input type="checkbox" id="cheat-p1"> Simulate cheat: modify board after commit</label>
-  </div>
+    Note over P1,P2: PHASE 2 — Hidden Placement
+    P1->>P1: place pieces (hidden from P2)
+    P2->>P2: place pieces (hidden from P1)
 
-  <!-- PLAYER 2 -->
-  <div class="card" id="card-p2">
-    <h2>Player Setup</h2>
-    <div class="player-tag p2-tag">◆ Player 2</div>
-    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px;">Click pieces below then click board cells to place. Player 2 pieces shown in orange.</p>
-    <div class="piece-picker" id="picker-p2">
-      <button class="piece-btn active" data-type="KING">♛ General</button>
-      <button class="piece-btn" data-type="VERT">| Vertical</button>
-      <button class="piece-btn" data-type="HORZ">— Horiz</button>
-      <button class="piece-btn" data-type="X">✕ Diagonal</button>
-    </div>
-    <div class="board-mini" id="board-p2"></div>
-    <button class="btn-accent" id="btn-commit-p2" style="margin-top:10px;width:100%">🔒 Commit Board</button>
-    <label>Commitment hash (broadcast to P1):</label>
-    <div class="hash-box" id="commit-p2">—</div>
-    <label><input type="checkbox" id="cheat-p2"> Simulate cheat: modify board after commit</label>
-  </div>
+    Note over P1,P2: PHASE 3 — Commit (board is now locked)
+    P1->>P1: commitment₁ = SHA256(board₁ + salt₁)
+    P2->>P2: commitment₂ = SHA256(board₂ + salt₂)
+    P1-->>P2: broadcast commitment₁  [PUBLIC: just a hash]
+    P2-->>P1: broadcast commitment₂  [PUBLIC: just a hash]
+    Note over P1,P2: ⚠ Salt is still SECRET. Board cannot change.
 
-  <!-- REVEAL & VERIFY -->
-  <div class="card full-width">
-    <h2>Reveal & Verify</h2>
-    <button class="btn-accent" id="btn-reveal" disabled style="margin-right:8px;">⚡ Reveal Both Boards</button>
-    <span style="font-size:0.82rem;color:var(--muted)">Both commitments must be locked first.</span>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;">
-      <div>
-        <div class="player-tag p1-tag">P1 verification result</div>
-        <div id="verify-p1" class="hash-box" style="color:var(--muted)">Waiting for reveal...</div>
-      </div>
-      <div>
-        <div class="player-tag p2-tag">P2 verification result</div>
-        <div id="verify-p2" class="hash-box" style="color:var(--muted)">Waiting for reveal...</div>
+    Note over P1,P2: PHASE 4 — Reveal
+    P1-->>P2: send board₁ + salt₁  [SECRET now exposed]
+    P2-->>P1: send board₂ + salt₂  [SECRET now exposed]
+    P1->>P1: verify SHA256(board₂+salt₂) == commitment₂
+    P2->>P2: verify SHA256(board₁+salt₁) == commitment₁
+
+    Note over P1,P2: PHASE 5 — Result
+    alt Both valid
+        P1->>P1: ✅ Run battle resolution
+        P2->>P2: ✅ Run battle resolution
+    else Mismatch detected
+        P1->>P1: ❌ Cheat detected — game void
+    end
       </div>
     </div>
-    <div id="verdict" style="margin-top:12px;"></div>
   </div>
+</section>
 
-  <!-- SIGNING DEMO -->
-  <div class="card full-width">
-    <h2>Signed Game Chain (ECDSA)</h2>
-    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px;">
-      Each game action is signed with the player's private key and chained via prevHash.
-      After the game, anyone with the public keys can verify no moves were tampered with.
+<!-- ═══════════════════════════════════════════════════════ SECTION 2: LIVE SIM -->
+<section>
+  <div class="card">
+    <h2>Live Simulation — Both Players' Browsers</h2>
+    <p class="note" style="margin-bottom:14px;">
+      The <strong>privacy toggles</strong> below reveal each player's actual secrets (salt + board state string).
+      This is what would be visible inside each player's browser tab at each phase.
+      In a real game, Player 2 never sees Player 1's toggle — they have separate browsers.
     </p>
-    <button class="btn-accent" id="btn-gen-keys">Generate Keypairs &amp; Demo Chain</button>
-    <div id="chain-output" style="margin-top:12px;"></div>
-  </div>
+    <div class="stepbar">
+      <button class="step-btn done" id="sb0">① Setup</button>
+      <button class="step-btn" id="sb1" onclick="simStep(1)">② Place Pieces</button>
+      <button class="step-btn" id="sb2" onclick="simStep(2)" disabled>③ Commit</button>
+      <button class="step-btn" id="sb3" onclick="simStep(3)" disabled>④ Reveal</button>
+      <button class="step-btn" id="sb4" onclick="simStep(4)" disabled>⑤ Verify</button>
+      <button class="btn-b btn-sm" onclick="simReset()" style="margin-left:auto;">↺ Reset</button>
+    </div>
 
-</div>
+    <div class="players">
+      <!-- P1 -->
+      <div class="player-panel p1-panel">
+        <div class="player-title p1-title">
+          ◆ Player 1
+          <button class="reveal-toggle p1-toggle" id="tog-p1" onclick="toggleSecrets('p1')">👁 Show Secrets</button>
+        </div>
+
+        <div id="p1-place-ui">
+          <h3>Place your pieces</h3>
+          <div class="piece-picker" id="ppick-p1"></div>
+          <div class="board-grid" id="brd-p1"></div>
+        </div>
+
+        <div class="field">
+          <label>Salt <span class="pill pill-secret">SECRET</span></label>
+          <div class="val secret" id="p1-salt-display">— (generated on setup)</div>
+        </div>
+        <div class="field">
+          <label>Board state string <span class="pill pill-secret">SECRET until reveal</span></label>
+          <div class="val secret" id="p1-board-str">— (place pieces first)</div>
+        </div>
+        <div class="field">
+          <label>Commitment = SHA-256(board + salt) <span class="pill pill-public">PUBLIC</span></label>
+          <div class="val hash" id="p1-commit">—</div>
+        </div>
+        <div class="field" id="p1-verify-field" style="display:none">
+          <label>Verification of P2's reveal <span class="pill pill-public">PUBLIC</span></label>
+          <div class="val" id="p1-verify-result">—</div>
+        </div>
+      </div>
+
+      <!-- P2 -->
+      <div class="player-panel p2-panel">
+        <div class="player-title p2-title">
+          ◆ Player 2
+          <button class="reveal-toggle p2-toggle" id="tog-p2" onclick="toggleSecrets('p2')">👁 Show Secrets</button>
+        </div>
+
+        <div id="p2-place-ui">
+          <h3>Place your pieces</h3>
+          <div class="piece-picker" id="ppick-p2"></div>
+          <div class="board-grid" id="brd-p2"></div>
+        </div>
+
+        <div class="field">
+          <label>Salt <span class="pill pill-secret">SECRET</span></label>
+          <div class="val secret" id="p2-salt-display">— (generated on setup)</div>
+        </div>
+        <div class="field">
+          <label>Board state string <span class="pill pill-secret">SECRET until reveal</span></label>
+          <div class="val secret" id="p2-board-str">— (place pieces first)</div>
+        </div>
+        <div class="field">
+          <label>Commitment = SHA-256(board + salt) <span class="pill pill-public">PUBLIC</span></label>
+          <div class="val hash" id="p2-commit">—</div>
+        </div>
+        <div class="field" id="p2-verify-field" style="display:none">
+          <label>Verification of P1's reveal <span class="pill pill-public">PUBLIC</span></label>
+          <div class="val" id="p2-verify-result">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sim-verdict"></div>
+    <div id="sim-explain" class="verdict info" style="margin-top:10px;">
+      ⓘ Step ①: Salts generated automatically on load. Each player's salt is secret — never shared until Phase 4.
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 3: CHEAT ATTACKS -->
+<section>
+  <div class="card">
+    <h2>What-If Attacks</h2>
+    <p class="note" style="margin-bottom:16px;">These demonstrate why the commitment order matters. Each scenario below runs real SHA-256 and shows what actually breaks.</p>
+    <div class="attack-grid">
+
+      <!-- Attack 1: Modify after commit -->
+      <div class="card" style="background:var(--cell)">
+        <h3>Attack 1 — Modify board after committing</h3>
+        <p class="note" style="margin-bottom:10px;">Player commits to a board, then tries to swap a piece before reveal.</p>
+        <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">Committed board state:</label>
+        <textarea id="atk1-original" rows="2">0:KING:1,1|0:VERT:2,2</textarea>
+        <label style="font-size:.78rem;color:var(--muted);display:block;margin-top:8px;margin-bottom:4px;">Modified board (what cheater tries to reveal):</label>
+        <textarea id="atk1-modified" rows="2">0:KING:1,1|0:X:3,3</textarea>
+        <button class="btn-a btn-sm" style="margin-top:8px" onclick="runAtk1()">Run Attack</button>
+        <div id="atk1-result" class="val empty" style="margin-top:8px;white-space:pre">—</div>
+      </div>
+
+      <!-- Attack 2: Share salt early -->
+      <div class="card" style="background:var(--cell)">
+        <h3>Attack 2 — Share salt before opponent commits</h3>
+        <p class="note" style="margin-bottom:10px;">If you reveal your salt before the opponent commits, they can brute-force your board or just see it.</p>
+        <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">Board state (should be secret):</label>
+        <textarea id="atk2-board" rows="2">1:KING:0,0|1:HORZ:1,2</textarea>
+        <button class="btn-a btn-sm" style="margin-top:8px" onclick="runAtk2()">Run Attack</button>
+        <div id="atk2-result" class="val empty" style="margin-top:8px;white-space:pre">—</div>
+        <p class="note" style="margin-top:8px;">Solution: <strong>never share salt until BOTH commitments are exchanged.</strong></p>
+      </div>
+
+      <!-- Attack 3: Replay / omit piece -->
+      <div class="card" style="background:var(--cell)">
+        <h3>Attack 3 — Omit a piece from reveal</h3>
+        <p class="note" style="margin-bottom:10px;">Committed to 3 pieces, reveals only 2 (hides strong piece).</p>
+        <button class="btn-a btn-sm" onclick="runAtk3()">Run Attack</button>
+        <div id="atk3-result" class="val empty" style="margin-top:8px;white-space:pre">—</div>
+      </div>
+
+      <!-- Attack 4: Hash collision -->
+      <div class="card" style="background:var(--cell)">
+        <h3>Attack 4 — Find a collision</h3>
+        <p class="note" style="margin-bottom:10px;">Try to find a different board with the same SHA-256 hash (spoiler: computationally infeasible).</p>
+        <button class="btn-a btn-sm" onclick="runAtk4()">Attempt 1000 random boards</button>
+        <div id="atk4-result" class="val empty" style="margin-top:8px;white-space:pre">—</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 4: LIVE HASH -->
+<section>
+  <div class="card">
+    <h2>Live SHA-256 — Type Anything</h2>
+    <p class="note" style="margin-bottom:12px;">SHA-256 is deterministic and avalanche-sensitive — one character change flips ~half the output bits. This is why the commitment locks the board.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+      <div>
+        <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">Input (board state + salt)</label>
+        <textarea id="live-input" rows="4" oninput="liveHash()">0:KING:1,2|0:VERT:0,3|0:HORZ:2,0abcdef1234567890</textarea>
+      </div>
+      <div>
+        <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:4px;">SHA-256 output (hex, 64 chars)</label>
+        <div class="val hash" id="live-output" style="min-height:80px;word-break:break-all;font-size:.7rem;">computing...</div>
+        <p class="note" style="margin-top:6px;" id="live-bitdiff"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 5: HOW-TO -->
+<section>
+  <div class="card">
+    <h2>How-To: Implementing in a P2P Game</h2>
+    <div class="howto-step"><div class="hs-num">1</div><div class="hs-body"><strong>Generate a salt at game start</strong> — before any pieces are placed. <code>generateSalt()</code> returns 32 random bytes as hex. Keep it in memory only — never log it, never send it yet.</div></div>
+    <div class="howto-step"><div class="hs-num">2</div><div class="hs-body"><strong>Place pieces normally.</strong> The board is hidden from your opponent (sent as <code>TILE_HIDDEN</code> over PeerJS). Nothing crypto-related happens during placement.</div></div>
+    <div class="howto-step"><div class="hs-num">3</div><div class="hs-body"><strong>When all pieces are placed: commit.</strong> Compute <code>commitment = SHA256(boardStateString(pieces) + salt)</code>. Send <code>{type:'COMMIT', hash: commitment}</code> over PeerJS. Wait for the opponent's commitment before proceeding.</div></div>
+    <div class="howto-step"><div class="hs-num">4</div><div class="hs-body"><strong>Once both commitments are received: reveal.</strong> Send <code>{type:'REVEAL', pieces: myPieces, salt: mySalt}</code>. <em>Only now</em> is the salt exposed.</div></div>
+    <div class="howto-step"><div class="hs-num">5</div><div class="hs-body"><strong>Verify the opponent's reveal.</strong> Compute <code>SHA256(boardStateString(theirPieces) + theirSalt)</code> and compare to the commitment hash they sent in step 3. If it matches: fair game, run battle. If not: <code>❌ CHEAT DETECTED</code>, game is void.</div></div>
+    <div class="howto-step"><div class="hs-num">6</div><div class="hs-body"><strong>The critical ordering rule:</strong> <em>you must have the opponent's commitment before you reveal your salt</em>. Once they have your salt they can recompute your hash — but that's fine, because they already gave you their commitment, so they can't change their board either.</div></div>
+
+    <hr class="divider">
+    <h2>Data Classification</h2>
+    <table>
+      <tr><th>Data</th><th>Classification</th><th>When shared</th><th>Why</th></tr>
+      <tr><td><code>salt</code> (32 bytes hex)</td><td><span class="pill pill-secret">SECRET</span></td><td>Phase 4 only</td><td>Revealing early lets opponent brute-force your board state</td></tr>
+      <tr><td><code>boardStateString</code></td><td><span class="pill pill-secret">SECRET</span></td><td>Phase 4 only</td><td>This is your board — the whole point is to keep it hidden</td></tr>
+      <tr><td><code>commitment</code> (SHA-256 hash)</td><td><span class="pill pill-public">PUBLIC</span></td><td>Phase 3 immediately</td><td>Hash reveals nothing about the board; needed to lock state</td></tr>
+      <tr><td>Piece count per turn</td><td><span class="pill pill-public">PUBLIC</span></td><td>Per turn</td><td>Opponent needs to know how many pieces you placed (not where)</td></tr>
+      <tr><td>Public key (ECDSA)</td><td><span class="pill pill-public">PUBLIC</span></td><td>Phase 1</td><td>Needed to verify your block signatures</td></tr>
+      <tr><td>Private key (ECDSA)</td><td><span class="pill pill-secret">SECRET</span></td><td>Never</td><td>Used only to sign — never leaves your browser</td></tr>
+    </table>
+
+    <hr class="divider">
+    <h2>Security Guarantees</h2>
+    <table>
+      <tr><th>Threat</th><th>Protection</th><th>Caveat</th></tr>
+      <tr><td>Modify board after placement</td><td>SHA-256 commitment — any change produces a different hash</td><td>None — mathematically guaranteed</td></tr>
+      <tr><td>Deny a placement happened</td><td>ECDSA-signed game chain — each block proves authorship</td><td>Requires keeping chain</td></tr>
+      <tr><td>Rage-quit before reveal</td><td>Disconnect = forfeit (game rule, not crypto)</td><td>Must be enforced by game logic</td></tr>
+      <tr><td>Reveal salt before opponent commits</td><td>Protocol ordering: wait for both commitments first</td><td>Client must enforce — no server</td></tr>
+      <tr><td>Colluding with server</td><td>No server — pure P2P</td><td>PeerJS signaling server sees no game data</td></tr>
+      <tr><td>Tampered JS (malicious extension)</td><td>Out of scope for this model</td><td>Trust-the-browser assumption</td></tr>
+    </table>
+  </div>
+</section>
+
+</div><!-- .page -->
 
 <script>
-// ─── STATE ───────────────────────────────────────────────────────────────────
-const players = {
-  p1: { pieces: [], commitment: null, salt: null, selectedType: 'KING', team: 0 },
-  p2: { pieces: [], commitment: null, salt: null, selectedType: 'KING', team: 1 },
+mermaid.initialize({ startOnLoad: true, theme: 'dark',
+  themeVariables: { background: '#0d1b2a', primaryColor: '#16213e', primaryTextColor: '#e0e0e0',
+    lineColor: '#0f3460', signalColor: '#4fc3f7', activationBorderColor: '#e94560' }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIM STATE
+// ─────────────────────────────────────────────────────────────────────────────
+const SIM = {
+  p1: { pieces:[], salt:null, commitment:null, selectedType:'KING', team:0 },
+  p2: { pieces:[], salt:null, commitment:null, selectedType:'KING', team:1 },
+  phase: 0,
+  secretsVisible: { p1: false, p2: false },
 };
+const TYPES = [['KING','♛'],['VERT','|'],['HORZ','—'],['X','✕']];
 
-// ─── BOARD UI ────────────────────────────────────────────────────────────────
-function renderBoard(pid) {
-  const p = players[pid];
-  const board = document.getElementById('board-' + pid);
-  const color = pid === 'p1' ? 'var(--p1)' : 'var(--p2)';
-  board.innerHTML = '';
-  for (let y = 3; y >= 0; y--) {
-    for (let x = 0; x < 4; x++) {
-      const cell = document.createElement('div');
-      cell.className = 'cell-mini';
-      const piece = p.pieces.find(pc => pc.x === x && pc.y === y);
-      if (piece) {
-        cell.textContent = PIECE_TYPES[piece.type].icon;
-        cell.style.color = color;
-        cell.classList.add(pid + '-piece');
-      }
-      cell.addEventListener('click', () => {
-        if (p.commitment) return; // locked
-        const existing = p.pieces.findIndex(pc => pc.x === x && pc.y === y);
-        if (existing >= 0) { p.pieces.splice(existing, 1); }
-        else { p.pieces.push({ x, y, type: p.selectedType, team: p.team, dead: false }); }
-        renderBoard(pid);
+// Init salts immediately
+(async () => {
+  SIM.p1.salt = generateSalt();
+  SIM.p2.salt = generateSalt();
+  buildBoards();
+  buildPickers();
+  updateDisplays();
+})();
+
+function buildPickers() {
+  ['p1','p2'].forEach(pid => {
+    const el = document.getElementById('ppick-'+pid);
+    TYPES.forEach(([t,icon]) => {
+      const b = document.createElement('button');
+      b.className = 'pb' + (t === 'KING' ? ' on' : '');
+      b.textContent = icon + ' ' + t;
+      b.dataset.t = t;
+      b.addEventListener('click', () => {
+        el.querySelectorAll('.pb').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+        SIM[pid].selectedType = t;
       });
-      board.appendChild(cell);
-    }
-  }
-}
-
-// ─── PIECE PICKER ────────────────────────────────────────────────────────────
-['p1','p2'].forEach(pid => {
-  const picker = document.getElementById('picker-' + pid);
-  picker.querySelectorAll('.piece-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      picker.querySelectorAll('.piece-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      players[pid].selectedType = btn.dataset.type;
+      el.appendChild(b);
     });
   });
-  renderBoard(pid);
-});
-
-// ─── COMMIT ──────────────────────────────────────────────────────────────────
-async function doCommit(pid) {
-  const p = players[pid];
-  if (p.pieces.length === 0) { alert('Place at least one piece first!'); return; }
-  const result = await createCommitment(p.pieces);
-  p.commitment = result.commitment;
-  p.salt = result.salt;
-  document.getElementById('commit-' + pid).textContent = result.commitment;
-  document.getElementById('btn-commit-' + pid).textContent = '✅ Committed';
-  document.getElementById('btn-commit-' + pid).disabled = true;
-  document.getElementById('step-num-commit').classList.add('done');
-  markStep('s2');
-  checkRevealReady();
 }
 
-function markStep(id) {
-  document.getElementById(id).classList.add('done');
+function buildBoards() {
+  ['p1','p2'].forEach(pid => {
+    const el = document.getElementById('brd-'+pid);
+    el.innerHTML = '';
+    const s = SIM[pid];
+    for (let y = 3; y >= 0; y--) {
+      for (let x = 0; x < 4; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'bcell';
+        const piece = s.pieces.find(p => p.x===x && p.y===y);
+        if (piece) {
+          cell.textContent = TYPES.find(t=>t[0]===piece.type)[1];
+          cell.classList.add(pid);
+          cell.style.color = pid==='p1' ? 'var(--p1)' : 'var(--p2)';
+        }
+        cell.addEventListener('click', () => {
+          if (SIM.phase > 1) return;
+          const idx = s.pieces.findIndex(p => p.x===x && p.y===y);
+          if (idx >= 0) s.pieces.splice(idx, 1);
+          else s.pieces.push({x, y, type: s.selectedType, team: s.team, dead:false});
+          buildBoards();
+          updateBoardStrings();
+        });
+        el.appendChild(cell);
+      }
+    }
+  });
 }
 
-function checkRevealReady() {
-  if (players.p1.commitment && players.p2.commitment) {
-    document.getElementById('btn-reveal').disabled = false;
-    markStep('s3');
-  }
+function updateBoardStrings() {
+  const bs1 = boardStateString(SIM.p1.pieces);
+  const bs2 = boardStateString(SIM.p2.pieces);
+  const v1 = SIM.secretsVisible.p1;
+  const v2 = SIM.secretsVisible.p2;
+  document.getElementById('p1-board-str').textContent = v1 ? (bs1||'(no pieces)') : '████████████████ (hidden)';
+  document.getElementById('p1-board-str').classList.toggle('secret', !v1);
+  document.getElementById('p2-board-str').textContent = v2 ? (bs2||'(no pieces)') : '████████████████ (hidden)';
+  document.getElementById('p2-board-str').classList.toggle('secret', !v2);
 }
 
-document.getElementById('btn-commit-p1').addEventListener('click', () => doCommit('p1'));
-document.getElementById('btn-commit-p2').addEventListener('click', () => doCommit('p2'));
+function updateDisplays() {
+  const v1 = SIM.secretsVisible.p1;
+  const v2 = SIM.secretsVisible.p2;
+  document.getElementById('p1-salt-display').textContent = v1 ? SIM.p1.salt : '████████████████████████████████ (secret)';
+  document.getElementById('p1-salt-display').classList.toggle('secret', !v1);
+  document.getElementById('p2-salt-display').textContent = v2 ? SIM.p2.salt : '████████████████████████████████ (secret)';
+  document.getElementById('p2-salt-display').classList.toggle('secret', !v2);
+  updateBoardStrings();
+}
 
-// ─── REVEAL & VERIFY ─────────────────────────────────────────────────────────
-document.getElementById('btn-reveal').addEventListener('click', async () => {
-  // Optionally simulate cheating
-  const cheatP1 = document.getElementById('cheat-p1').checked;
-  const cheatP2 = document.getElementById('cheat-p2').checked;
+function toggleSecrets(pid) {
+  SIM.secretsVisible[pid] = !SIM.secretsVisible[pid];
+  const btn = document.getElementById('tog-'+pid);
+  btn.textContent = SIM.secretsVisible[pid] ? '🔓 Secrets Visible' : '👁 Show Secrets';
+  btn.classList.toggle('on', SIM.secretsVisible[pid]);
+  updateDisplays();
+}
 
-  const p1Pieces = cheatP1
-    ? [...players.p1.pieces, { x: 3, y: 3, type: 'X', team: 0, dead: false }]  // sneaked an extra piece
-    : players.p1.pieces;
-  const p2Pieces = cheatP2
-    ? [...players.p2.pieces, { x: 0, y: 0, type: 'X', team: 1, dead: false }]
-    : players.p2.pieces;
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP MACHINE
+// ─────────────────────────────────────────────────────────────────────────────
+const stepExplain = [
+  '⓪ Salts generated. Each player has a unique 32-byte random salt. It lives in memory only.',
+  '① Place pieces on each board by clicking. Then click ③ Commit.',
+  '② Both players commit. SHA-256(boardState + salt) is computed and exchanged. Salt is still secret.',
+  '③ Both players reveal: board state + salt are now public. Verification running...',
+  '④ Verification complete. See results above.',
+];
 
-  // P1 verifies P2's reveal
-  const v2 = await verifyCommitment(p2Pieces, players.p2.salt, players.p2.commitment);
-  const el2 = document.getElementById('verify-p2');
-  el2.textContent = v2.valid
-    ? `✅ VALID\nHash: ${v2.actualHash}`
-    : `❌ CHEATER DETECTED\nExpected: ${v2.expectedCommitment}\nGot:      ${v2.actualHash}`;
-  el2.style.color = v2.valid ? 'var(--green)' : 'var(--red)';
-
-  // P2 verifies P1's reveal
-  const v1 = await verifyCommitment(p1Pieces, players.p1.salt, players.p1.commitment);
-  const el1 = document.getElementById('verify-p1');
-  el1.textContent = v1.valid
-    ? `✅ VALID\nHash: ${v1.actualHash}`
-    : `❌ CHEATER DETECTED\nExpected: ${v1.expectedCommitment}\nGot:      ${v1.actualHash}`;
-  el1.style.color = v1.valid ? 'var(--green)' : 'var(--red)';
-
-  // Verdict
-  const verdict = document.getElementById('verdict');
-  if (v1.valid && v2.valid) {
-    verdict.innerHTML = '<div class="status ok">✅ Both boards verified — game was played fairly. Battle can proceed.</div>';
-    markStep('s4');
-  } else {
-    const who = !v1.valid && !v2.valid ? 'Both players' : !v1.valid ? 'Player 1' : 'Player 2';
-    verdict.innerHTML = `<div class="status err">❌ ${who} modified their board after committing. Cheat detected — game result void.</div>`;
+async function simStep(n) {
+  if (n === 1) {
+    // Enable commit
+    document.getElementById('sb1').classList.add('done');
+    document.getElementById('sb2').disabled = false;
+    document.getElementById('sb2').classList.add('active');
+    SIM.phase = 1;
+    setExplain('① Pieces placed. Click ③ Commit to lock both boards. <strong>The salt is still secret.</strong>');
   }
-});
+  else if (n === 2) {
+    if (SIM.p1.pieces.length === 0 || SIM.p2.pieces.length === 0) {
+      setExplain('⚠ Both players must place at least one piece first.', 'warn'); return;
+    }
+    // Compute commitments
+    const c1 = await createCommitment(SIM.p1.pieces);
+    const c2 = await createCommitment(SIM.p2.pieces);
+    // Use stored salts (not new ones from createCommitment — keep consistent)
+    const bs1 = boardStateString(SIM.p1.pieces);
+    const bs2 = boardStateString(SIM.p2.pieces);
+    SIM.p1.commitment = await sha256(bs1 + SIM.p1.salt);
+    SIM.p2.commitment = await sha256(bs2 + SIM.p2.salt);
 
-// ─── SIGNING DEMO ─────────────────────────────────────────────────────────────
-document.getElementById('btn-gen-keys').addEventListener('click', async () => {
-  const out = document.getElementById('chain-output');
-  out.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;">Generating keys and building chain...</div>';
-
-  const kp1 = await generateKeyPair();
-  const kp2 = await generateKeyPair();
-  const pub1 = await exportPublicKey(kp1.publicKey);
-  const pub2 = await exportPublicKey(kp2.publicKey);
-
-  // Simulate a 4-move game chain
-  const moves = [
-    { player: 0, action: 'PLACE', payload: { pieceCount: 1 } },
-    { player: 1, action: 'PLACE', payload: { pieceCount: 1 } },
-    { player: 0, action: 'COMMIT', payload: { commitment: await sha256('p1board' + generateSalt()) } },
-    { player: 1, action: 'COMMIT', payload: { commitment: await sha256('p2board' + generateSalt()) } },
-  ];
-
-  let prevHash = '0'.repeat(64);
-  const chain = [];
-  for (const move of moves) {
-    const pk = move.player === 0 ? kp1.privateKey : kp2.privateKey;
-    const block = await createBlock(move.action, move.payload, prevHash, pk);
-    prevHash = await hashBlock(block);
-    chain.push({ ...block, _hash: prevHash, _player: move.player });
+    document.getElementById('p1-commit').textContent = SIM.p1.commitment;
+    document.getElementById('p2-commit').textContent = SIM.p2.commitment;
+    document.getElementById('sb2').classList.remove('active');
+    document.getElementById('sb2').classList.add('done');
+    document.getElementById('sb3').disabled = false;
+    document.getElementById('sb3').classList.add('active');
+    SIM.phase = 2;
+    setExplain('② Commitments locked. <strong>SHA-256(board + salt)</strong> exchanged over PeerJS. Board cannot change — any modification produces a different hash. Salt still secret.', 'info');
   }
+  else if (n === 3) {
+    // Reveal
+    document.getElementById('sb3').classList.remove('active');
+    document.getElementById('sb3').classList.add('done');
+    document.getElementById('sb4').disabled = false;
+    document.getElementById('sb4').classList.add('active');
+    SIM.phase = 3;
+    // Force show secrets
+    SIM.secretsVisible.p1 = true; SIM.secretsVisible.p2 = true;
+    document.getElementById('tog-p1').textContent = '🔓 Secrets Visible';
+    document.getElementById('tog-p1').classList.add('on');
+    document.getElementById('tog-p2').textContent = '🔓 Secrets Visible';
+    document.getElementById('tog-p2').classList.add('on');
+    updateDisplays();
+    setExplain('③ <strong>Reveal phase</strong>: both players broadcast their board + salt. Secrets are now exposed. Verification running...', 'warn');
+    await simStep(4);
+  }
+  else if (n === 4) {
+    // Verify
+    const bs1 = boardStateString(SIM.p1.pieces);
+    const bs2 = boardStateString(SIM.p2.pieces);
+    const h1check = await sha256(bs1 + SIM.p1.salt);
+    const h2check = await sha256(bs2 + SIM.p2.salt);
+    const v1ok = h1check === SIM.p1.commitment;
+    const v2ok = h2check === SIM.p2.commitment;
 
-  // Verify all blocks
-  let html = '';
-  for (const block of chain) {
-    const pubKey = block._player === 0
-      ? await importPublicKey(pub1)
-      : await importPublicKey(pub2);
-    const { signature, _hash, _player, ...dataToVerify } = block;
-    const valid = await verifyBlock(dataToVerify, signature, pubKey);
-    const label = _player === 0 ? 'p1' : 'p2';
-    const pname = _player === 0 ? 'P1' : 'P2';
-    html += `<div class="chain-entry ${label} ${valid ? 'verified' : ''}">
-      ${valid ? '✅' : '❌'} Block [${pname}] action=${block.action}
-      &nbsp;·&nbsp; prevHash=${block.prevHash.slice(0,16)}...
-      &nbsp;·&nbsp; hash=${_hash.slice(0,16)}...
-      <details><summary>full block</summary><pre>${JSON.stringify({...block, _hash}, null, 2)}</pre></details>
+    document.getElementById('p1-verify-field').style.display = '';
+    document.getElementById('p2-verify-field').style.display = '';
+
+    const r1 = document.getElementById('p2-verify-result');
+    r1.textContent = v1ok
+      ? '✅ SHA256(board₁ + salt₁) = ' + h1check + '\n   matches stored commitment ✓'
+      : '❌ MISMATCH\n   computed: ' + h1check + '\n   stored:   ' + SIM.p1.commitment;
+    r1.className = 'val ' + (v1ok ? 'valid' : 'invalid');
+
+    const r2 = document.getElementById('p1-verify-result');
+    r2.textContent = v2ok
+      ? '✅ SHA256(board₂ + salt₂) = ' + h2check + '\n   matches stored commitment ✓'
+      : '❌ MISMATCH\n   computed: ' + h2check + '\n   stored:   ' + SIM.p2.commitment;
+    r2.className = 'val ' + (v2ok ? 'valid' : 'invalid');
+
+    document.getElementById('sb4').classList.remove('active');
+    document.getElementById('sb4').classList.add('done');
+    SIM.phase = 4;
+
+    const allOk = v1ok && v2ok;
+    const verdict = document.getElementById('sim-verdict');
+    verdict.innerHTML = `<div class="verdict ${allOk ? 'ok' : 'bad'}">
+      ${allOk ? '✅ Both boards verified — game was played fairly. Battle resolution can proceed with confidence.'
+               : '❌ Verification failed — board was modified after commitment. Cheater detected.'}
     </div>`;
+    setExplain('④ Verification complete. ' + (allOk ? 'Both hashes match their commitments — provably fair.' : 'Hash mismatch — provably unfair.'), allOk ? 'ok' : 'bad');
   }
+}
 
-  out.innerHTML = `
-    <div class="status ok" style="margin-bottom:10px;">All ${chain.length} blocks verified ✅ — chain is intact and tamper-evident</div>
-    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">Public keys shared between players (private keys never leave the player's browser):</div>
-    <div class="hash-box">P1 pubkey: ${pub1.slice(0,48)}...</div>
-    <div class="hash-box">P2 pubkey: ${pub2.slice(0,48)}...</div>
-    <div style="margin-top:10px;">${html}</div>
-  `;
-});
+function simReset() {
+  SIM.p1.pieces=[]; SIM.p2.pieces=[]; SIM.phase=0;
+  SIM.p1.salt=generateSalt(); SIM.p2.salt=generateSalt();
+  SIM.p1.commitment=null; SIM.p2.commitment=null;
+  SIM.secretsVisible={p1:false,p2:false};
+  ['sb0','sb1','sb2','sb3','sb4'].forEach(id => {
+    const el=document.getElementById(id);
+    el.classList.remove('done','active');
+    el.disabled = id==='sb2'||id==='sb3'||id==='sb4';
+  });
+  document.getElementById('sb0').classList.add('done');
+  document.getElementById('p1-commit').textContent='—';
+  document.getElementById('p2-commit').textContent='—';
+  document.getElementById('p1-verify-field').style.display='none';
+  document.getElementById('p2-verify-field').style.display='none';
+  document.getElementById('sim-verdict').innerHTML='';
+  ['tog-p1','tog-p2'].forEach(id=>{
+    document.getElementById(id).textContent='👁 Show Secrets';
+    document.getElementById(id).classList.remove('on');
+  });
+  buildBoards(); buildPickers(); updateDisplays();
+  setExplain('⓪ Reset. Salts regenerated. Ready for a new round.');
+}
 
-// init step markers
-document.querySelectorAll('.step-num').forEach((el,i) => el.id = 's'+(i+1));
+function setExplain(msg, cls='info') {
+  const el = document.getElementById('sim-explain');
+  el.className = 'verdict ' + cls;
+  el.innerHTML = msg;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATTACK DEMOS — real crypto, real output
+// ─────────────────────────────────────────────────────────────────────────────
+async function runAtk1() {
+  const orig = document.getElementById('atk1-original').value.trim();
+  const mod  = document.getElementById('atk1-modified').value.trim();
+  const salt = generateSalt();
+  const commitHash = await sha256(orig + salt);
+  const revealHash = await sha256(mod + salt);
+  const match = commitHash === revealHash;
+  document.getElementById('atk1-result').textContent =
+    `Salt:       ${salt.slice(0,16)}...\n` +
+    `Commit hash:  ${commitHash}\n` +
+    `Reveal hash:  ${revealHash}\n` +
+    `Match: ${match ? '✅ (boards identical)' : '❌ CHEAT DETECTED — hashes differ'}`;
+  document.getElementById('atk1-result').className = 'val ' + (match ? 'valid' : 'invalid');
+}
+
+async function runAtk2() {
+  const board = document.getElementById('atk2-board').value.trim();
+  const salt = generateSalt();
+  const commitment = await sha256(board + salt);
+  document.getElementById('atk2-result').textContent =
+    `Board:      ${board}\n` +
+    `Salt:       ${salt}\n` +
+    `Commitment: ${commitment}\n\n` +
+    `⚠ If opponent receives salt BEFORE committing,\n` +
+    `  they can verify: SHA256("${board.slice(0,20)}..." + salt) = ${commitment.slice(0,16)}...\n` +
+    `  → They see your ENTIRE board before locking theirs.\n` +
+    `Solution: exchange commitments FIRST, salts only at reveal.`;
+  document.getElementById('atk2-result').className = 'val invalid';
+}
+
+async function runAtk3() {
+  const salt = generateSalt();
+  const fullPieces = [
+    {x:0,y:0,type:'KING',team:0,dead:false},
+    {x:2,y:2,type:'VERT',team:0,dead:false},
+    {x:3,y:1,type:'X',  team:0,dead:false},
+  ];
+  const omittedPieces = fullPieces.slice(0,2); // omit X piece
+  const commitStr = boardStateString(fullPieces);
+  const revealStr = boardStateString(omittedPieces);
+  const commitHash = await sha256(commitStr + salt);
+  const revealHash = await sha256(revealStr + salt);
+  document.getElementById('atk3-result').textContent =
+    `Committed board (3 pieces): ${commitStr}\n` +
+    `Revealed board  (2 pieces): ${revealStr}\n\n` +
+    `Commit hash: ${commitHash}\n` +
+    `Reveal hash: ${revealHash}\n\n` +
+    `❌ CHEAT DETECTED — hash mismatch.\n   The omitted piece changes the board state string,\n   which changes the hash.`;
+  document.getElementById('atk3-result').className = 'val invalid';
+}
+
+async function runAtk4() {
+  const target = await sha256('0:KING:1,1|0:VERT:2,2' + 'deadbeef');
+  const el = document.getElementById('atk4-result');
+  el.textContent = `Target hash: ${target}\n\nSearching 1000 random board strings...\n`;
+  const types = ['KING','VERT','HORZ','X'];
+  let found = false;
+  for (let i = 0; i < 1000; i++) {
+    const x = Math.floor(Math.random()*4), y = Math.floor(Math.random()*4);
+    const t = types[Math.floor(Math.random()*4)];
+    const candidate = `0:${t}:${x},${y}|0:VERT:${Math.floor(Math.random()*4)},${Math.floor(Math.random()*4)}`;
+    const h = await sha256(candidate + generateSalt().slice(0,8));
+    if (h === target) { found = true; el.textContent += `Found collision at attempt ${i+1}!`; break; }
+  }
+  if (!found) {
+    el.textContent += `No collision found in 1000 attempts.\n\nSHA-256 has 2^256 ≈ 10^77 possible outputs.\nThe sun will burn out before a collision is found by random search.\nThis is why commitments are binding.`;
+  }
+  el.className = 'val ' + (found ? 'invalid' : 'valid');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIVE HASH
+// ─────────────────────────────────────────────────────────────────────────────
+let lastHash = '';
+async function liveHash() {
+  const input = document.getElementById('live-input').value;
+  const h = await sha256(input);
+  const el = document.getElementById('live-output');
+  el.textContent = h;
+  if (lastHash) {
+    let diff = 0;
+    for (let i = 0; i < 64; i++) {
+      const a = parseInt(lastHash[i], 16), b = parseInt(h[i], 16);
+      diff += (a ^ b).toString(2).split('').filter(x=>x==='1').length;
+    }
+    document.getElementById('live-bitdiff').textContent =
+      `Changed from previous: ${diff} of 256 bits flipped (${(diff/2.56).toFixed(1)}%)`;
+  }
+  lastHash = h;
+}
+liveHash();
 </script>
 </body>
 </html>

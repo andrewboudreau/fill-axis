@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fill Axis</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="engine/crypto.js"></script>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -530,8 +531,11 @@ function renderGame() {
 
 function renderBanner() {
   const banner = document.getElementById('turn-banner');
-  if (G.phase === 'REVEAL') {
-    banner.textContent = 'REVEALING...';
+  if (G.phase === 'COMMITTING') {
+    banner.textContent = '🔒 Exchanging commitments...';
+    banner.className = 'turn-banner banner-reveal';
+  } else if (G.phase === 'REVEAL') {
+    banner.textContent = '🔓 Revealing & Verifying...';
     banner.className = 'turn-banner banner-reveal';
   } else if (G.phase === 'BATTLE') {
     banner.textContent = 'BATTLE RESOLVING...';
@@ -686,6 +690,12 @@ let conn = null;       // active DataConnection
 let myTeam = 0;        // 0 = host, 1 = guest
 let connectTimeout = null;
 
+// Commitment state (P2P only)
+let mySalt = null;
+let myCommitment = null;
+let opponentCommitment = null;  // received from peer at commit phase
+let commitResolve = null;       // promise resolver waiting for opponent commit
+
 function genRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -731,7 +741,6 @@ function handleMessage(raw) {
   try { msg = JSON.parse(raw); } catch(e) { return; }
 
   if (msg.type === 'JOIN') {
-    // Host receives guest name, starts game
     clearTimeout(connectTimeout);
     setConnStatus('connected');
     const hostName = document.getElementById('player-name').value || 'Player 1';
@@ -742,17 +751,14 @@ function handleMessage(raw) {
     startP2PGame(hostName, guestName, boardSize);
   }
   else if (msg.type === 'GAME_START') {
-    // Guest receives config, starts game
     clearTimeout(connectTimeout);
     setConnStatus('connected');
     myTeam = 1;
     const myName = document.getElementById('player-name').value || 'Player 2';
-    // names[1] might be overridden by host — but we use our local name for display
     startP2PGame(msg.names[0], myName, msg.boardSize);
   }
   else if (msg.type === 'PLACE') {
     if (!G) return;
-    // Opponent placed a piece — apply as hidden
     G.pieces.push({ x: msg.x, y: msg.y, type: msg.pieceType, team: 1 - myTeam, dead: false, hidden: true });
     G.tray[1 - myTeam][msg.pieceType]--;
     G.tilesPlacedThisTurn++;
@@ -762,40 +768,99 @@ function handleMessage(raw) {
     if (!G) return;
     G.tilesPlacedThisTurn = 0;
     if (allPiecesPlaced()) {
-      startReveal();
+      // Don't reveal yet — wait for COMMIT exchange
+      G.phase = 'COMMITTING';
+      renderBanner();
     } else {
       G.currentTeam = 1 - G.currentTeam;
       renderGame();
     }
   }
+  else if (msg.type === 'COMMIT') {
+    // Received opponent's commitment hash
+    opponentCommitment = msg.hash;
+    if (commitResolve) { commitResolve(); commitResolve = null; }
+  }
   else if (msg.type === 'REVEAL') {
-    if (!G) return;
-    startReveal();
+    // Opponent is revealing their board — verify then proceed
+    if (!G || !opponentCommitment) return;
+    (async () => {
+      const result = await verifyCommitment(msg.pieces, msg.salt, opponentCommitment);
+      if (!result.valid) {
+        showVerifyResult(false, result.error);
+        return;
+      }
+      // Apply opponent's real pieces now
+      G.pieces = G.pieces.filter(p => p.team === myTeam); // remove opponent hidden pieces
+      for (const p of msg.pieces) {
+        G.pieces.push({ ...p, team: 1 - myTeam, dead: false, hidden: false });
+      }
+      showVerifyResult(true, null);
+      startReveal();
+    })();
   }
 }
 
-function startP2PGame(p1, p2, size) {
-  setupGame(p1, p2, size, 'p2p');
-  G.myTeam = myTeam;
-  setConnStatus('connected');
-  // Label trays by perspective
-  document.getElementById('tray-label-p1').textContent = myTeam === 0 ? 'Your Pieces' : p1;
-  document.getElementById('tray-label-p2').textContent = myTeam === 1 ? 'Your Pieces' : p2;
-}
-
-// Override endTurn for P2P: sync with peer
-const _localEndTurn = endTurn;
+// P2P end-turn: sync then do commitment exchange when all pieces placed
 function p2pEndTurn() {
   sendMsg({ type: 'END_TURN' });
   if (allPiecesPlaced()) {
-    // Host triggers reveal for both
-    if (myTeam === 0) sendMsg({ type: 'REVEAL' });
-    startReveal();
+    G.phase = 'COMMITTING';
+    renderBanner();
+    runCommitmentExchange();
   } else {
     G.tilesPlacedThisTurn = 0;
     G.currentTeam = 1 - G.currentTeam;
     renderGame();
   }
+}
+
+async function runCommitmentExchange() {
+  // Step 1: compute our commitment (salt was generated at game start)
+  const myPieces = G.pieces.filter(p => p.team === myTeam);
+  myCommitment = await sha256(boardStateString(myPieces) + mySalt);
+
+  // Step 2: send our commitment
+  sendMsg({ type: 'COMMIT', hash: myCommitment });
+  setConnStatus('connecting'); // repurpose as "waiting"
+
+  // Step 3: wait for opponent's commitment (may already have arrived)
+  if (!opponentCommitment) {
+    await new Promise(resolve => { commitResolve = resolve; });
+  }
+
+  // Step 4: both commitments locked — now reveal
+  setConnStatus('connected');
+  sendMsg({ type: 'REVEAL', pieces: myPieces, salt: mySalt });
+  // Reveal will be processed when we receive opponent's REVEAL message
+}
+
+function showVerifyResult(valid, error) {
+  const banner = document.getElementById('turn-banner');
+  if (valid) {
+    banner.textContent = '✅ Board verified — opponent played fairly';
+    banner.className = 'turn-banner banner-reveal';
+  } else {
+    banner.textContent = '❌ CHEAT DETECTED — board hash mismatch';
+    banner.className = 'turn-banner';
+    banner.style.background = 'rgba(255,23,68,0.3)';
+    banner.style.color = '#ff1744';
+    banner.style.border = '1px solid #ff1744';
+    console.error('Commitment verification failed:', error);
+  }
+}
+
+function startP2PGame(p1, p2, size) {
+  // Generate salt at game start — before any pieces are placed
+  mySalt = generateSalt();
+  opponentCommitment = null;
+  myCommitment = null;
+  commitResolve = null;
+  setupGame(p1, p2, size, 'p2p');
+  G.myTeam = myTeam;
+  setConnStatus('connected');
+  document.getElementById('tray-label-p1').textContent = myTeam === 0 ? 'Your Pieces' : p1;
+  document.getElementById('tray-label-p2').textContent = myTeam === 1 ? 'Your Pieces' : p2;
 }
 
 // Patch finish-btn click to use p2p version when in p2p mode
