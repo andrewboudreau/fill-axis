@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fill Axis — Nuke</title>
+<script src="engine/version.js"></script>
+<script src="engine/crypto.js"></script>
+<script src="engine/storage.js"></script>
+<script src="engine/identity.js"></script>
+<style>
+:root{--bg:#1a1a2e;--panel:#16213e;--border:#0f3460;--accent:#e94560;--p1:#4fc3f7;--p2:#ff8a65;
+  --green:#69f0ae;--yellow:#ffd54f;--red:#ff5252;--cell:#0d1b2a;--text:#e0e0e0;--muted:#778;--mono:'Fira Mono','Consolas',monospace;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;}
+nav{display:flex;gap:6px;background:var(--panel);padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;}
+nav a{color:var(--muted);text-decoration:none;padding:5px 12px;border-radius:4px;font-size:.88rem;}
+nav a:hover,nav a.active{background:rgba(233,69,96,.15);color:var(--accent);}
+.page{max-width:700px;margin:0 auto;padding:24px 16px;}
+h1{font-size:2rem;letter-spacing:4px;color:var(--accent);text-transform:uppercase;margin-bottom:8px;}
+.subtitle{color:var(--muted);font-size:.88rem;margin-bottom:24px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;}
+.card h2{font-size:.88rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;}
+button{cursor:pointer;border:none;border-radius:6px;padding:9px 20px;font-size:.88rem;font-weight:700;}
+button:hover{opacity:.83;}
+.btn-a{background:var(--accent);color:#fff;}
+.dbg-row{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #1a2840;font-size:.82rem;}
+.dbg-key{color:var(--muted);min-width:140px;font-family:var(--mono);}
+code{background:var(--cell);padding:2px 6px;border-radius:3px;font-family:var(--mono);font-size:.85em;}
+</style>
+</head>
+<body>
+<nav>
+  <a href="lobby.html">🏠 Lobby</a>
+  <a href="rules.html">📖 Rules</a>
+  <a href="crypto-demo.html">🔐 Crypto</a>
+  <a href="audit.html">📋 Audit</a>
+  <a href="nuke.html" class="active">💥 Nuke</a>
+  <span id="version-badge" style="margin-left:auto;font-size:.75rem;font-family:monospace;padding:4px 10px;"></span>
+</nav>
+<div class="page">
+  <h1>💥 Nuke</h1>
+  <p class="subtitle">Developer reset — clears ALL local state and tombstones known games in blob storage.</p>
+
+  <div class="card">
+    <h2>What this does</h2>
+    <ul style="font-size:.88rem;color:var(--muted);line-height:2;padding-left:16px;">
+      <li>Clears all <code>fillaxis_*</code> keys from localStorage (device ID, keypair, game list, all local game state)</li>
+      <li>Overwrites each known game blob with a <code>{ phase: 'NUKED', ... }</code> tombstone</li>
+      <li>Blob storage cannot be listed or deleted (SAS permission limit) — blobs expire 2026-04-30</li>
+      <li>After nuke: refreshing any page generates a fresh device identity</li>
+    </ul>
+  </div>
+
+  <div class="card" id="pre-nuke">
+    <h2>Current State</h2>
+    <div id="state-summary">Loading...</div>
+    <br>
+    <button class="btn-a" style="background:#ff5252" onclick="confirmNuke()">💥 NUKE EVERYTHING</button>
+  </div>
+
+  <div class="card" id="post-nuke" style="display:none">
+    <h2>Nuked</h2>
+    <div id="nuke-log" style="font-family:monospace;font-size:.8rem;line-height:1.8;"></div>
+    <br>
+    <a href="lobby.html" class="btn-a" style="display:inline-block;text-decoration:none;padding:9px 20px;border-radius:6px;font-weight:700;font-size:.88rem;background:var(--accent);color:#fff;">Start Fresh →</a>
+  </div>
+</div>
+
+<script>
+// Show current state before nuke
+function showState() {
+  const deviceId = localStorage.getItem('fillaxis_deviceId');
+  const name = localStorage.getItem('fillaxis_name');
+  const games = JSON.parse(localStorage.getItem('fillaxis_games') || '[]');
+  const gameKeys = Object.keys(localStorage).filter(k => k.startsWith('fillaxis_game_'));
+
+  document.getElementById('state-summary').innerHTML = `
+    <div class="dbg-row"><span class="dbg-key">Device ID</span><span>${deviceId || 'none'}</span></div>
+    <div class="dbg-row"><span class="dbg-key">Name</span><span>${name || 'none'}</span></div>
+    <div class="dbg-row"><span class="dbg-key">Active games</span><span>${games.join(', ') || 'none'}</span></div>
+    <div class="dbg-row"><span class="dbg-key">Local game states</span><span>${gameKeys.length} stored</span></div>
+    <div class="dbg-row"><span class="dbg-key">All fillaxis_* keys</span><span>${Object.keys(localStorage).filter(k=>k.startsWith('fillaxis_')).length} total</span></div>
+  `;
+}
+
+async function confirmNuke() {
+  const log = [];
+
+  // 1. Get game codes before clearing
+  const games = JSON.parse(localStorage.getItem('fillaxis_games') || '[]');
+
+  // 2. Tombstone blobs
+  for (const code of games) {
+    try {
+      await blobWrite(`game-async-${code}-state.json`, {
+        code, phase: 'NUKED', nukedAt: new Date().toISOString(),
+        players: [], moves: [], note: 'Game nuked by developer reset'
+      });
+      log.push(`✅ Tombstoned blob: game-async-${code}-state.json`);
+    } catch(e) {
+      log.push(`⚠ Could not tombstone ${code}: ${e.message}`);
+    }
+  }
+
+  // 3. Clear all localStorage
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('fillaxis_'));
+  keys.forEach(k => localStorage.removeItem(k));
+  log.push(`🗑 Cleared ${keys.length} localStorage keys: ${keys.join(', ')}`);
+
+  // 4. Show result
+  document.getElementById('pre-nuke').style.display = 'none';
+  document.getElementById('post-nuke').style.display = '';
+  document.getElementById('nuke-log').innerHTML = log.map(l => `<div>${l}</div>`).join('');
+}
+
+showState();
+
+// Version badge
+if (typeof FILL_AXIS_VERSION !== 'undefined') {
+  const badge = document.getElementById('version-badge');
+  if (badge) badge.textContent = 'v' + FILL_AXIS_VERSION;
+}
+</script>
+</body>
+</html>

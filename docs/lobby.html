@@ -99,11 +99,10 @@ input[type=text]:focus,select:focus{border-color:var(--accent);}
 <body>
 <nav>
   <a href="lobby.html" class="active">🏠 Lobby</a>
-  <a href="index.html">▶ Real-time</a>
-  <a href="attack-zones.html">⚔ Attack Zones</a>
   <a href="rules.html">📖 Rules</a>
   <a href="crypto-demo.html">🔐 Crypto</a>
   <a href="audit.html">📋 Audit</a>
+  <a href="nuke.html">💥 Nuke</a>
   <span id="version-badge" style="margin-left:auto;font-size:.75rem;font-family:monospace;padding:4px 10px;"></span>
 </nav>
 <div class="page">
@@ -293,7 +292,7 @@ async function buildGameCard(code) {
 }
 
 function openGame(code) {
-  window.location.href = `async.html?game=${code}`;
+  window.location.href = `game.html?game=${code}`;
 }
 
 function removeGame(code) {
@@ -382,7 +381,7 @@ document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 initIdentity().then(() => refreshGames());
 // Refresh every 30s
-setInterval(refreshGames, 30000);
+setInterval(refreshGames, 15000);
 </script>
 </body>
 </html>
