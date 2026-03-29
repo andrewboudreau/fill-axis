@@ -51,17 +51,10 @@
   code { background: var(--cell); padding: 1px 5px; border-radius: 3px; font-size: 0.85em; color: var(--p1); }
 </style>
 <script src="engine/version.js"></script>
+<script src="engine/nav.js"></script>
 </head>
 <body>
-<nav>
-  <a href="lobby.html">🏠 Lobby</a>
-  <a href="lobby.html">▶ Play</a>
-  <a href="attack-zones.html">⚔ Attack Zones</a>
-  <a href="scoring.html">📊 Scoring</a>
-  <a href="rules.html" class="active">📖 Rules</a>
-  <a href="crypto-demo.html">🔐 Crypto</a>
-  <span id="version-badge" style="margin-left:auto;font-size:.75rem;font-family:monospace;padding:4px 10px;"></span>
-</nav>
+<nav id="site-nav"></nav>
 <main>
   <h1>Fill Axis</h1>
   <div class="tagline">Rules Reference — Two-Player Territory Game</div>
@@ -73,7 +66,7 @@
     <div class="mode-card mode-realtime">
       <h3>▶ Real-time (PeerJS)</h3>
       <p>Same-screen local play, or host/join with a room code. Both players must be online simultaneously. Placement and reveal happen in one session.</p>
-      <a href="index.html">Open Real-time Game →</a>
+      <a href="lobby.html">Play →</a>
     </div>
     <div class="mode-card mode-async">
       <h3>⏳ Async / Turn-based</h3>

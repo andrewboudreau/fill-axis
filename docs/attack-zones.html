@@ -38,18 +38,10 @@
   #hint { color: var(--muted); font-size: 0.85rem; min-height: 20px; }
 </style>
 <script src="engine/version.js"></script>
+<script src="engine/nav.js"></script>
 </head>
 <body>
-<nav>
-  <a href="lobby.html">🏠 Lobby</a>
-  <a href="lobby.html">▶ Play</a>
-  <a href="attack-zones.html" class="active">⚔ Attack Zones</a>
-  <a href="scoring.html">📊 Scoring</a>
-  <a href="rules.html">📖 Rules</a>
-  <a href="crypto-demo.html">🔐 Crypto</a>
-  <a href="audit.html">📋 Audit</a>
-  <span id="version-badge" style="margin-left:auto;font-size:.75rem;font-family:monospace;padding:4px 10px;"></span>
-</nav>
+<nav id="site-nav"></nav>
 <div id="app">
   <h1>Attack Zone Demo</h1>
   <p class="sub">Select a piece type, then click a cell to see its attack range</p>

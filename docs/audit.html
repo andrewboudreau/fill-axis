@@ -55,18 +55,10 @@ th{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:1
 td{padding:8px 10px;border-bottom:1px solid #1a2840;font-family:var(--mono);font-size:.75rem;}
 </style>
 <script src="engine/version.js"></script>
+<script src="engine/nav.js"></script>
 </head>
 <body>
-<nav>
-  <a href="lobby.html">🏠 Lobby</a>
-  <a href="lobby.html">▶ Play</a>
-  <a href="attack-zones.html">⚔ Attack Zones</a>
-  <a href="scoring.html">📊 Scoring</a>
-  <a href="rules.html">📖 Rules</a>
-  <a href="crypto-demo.html">🔐 Crypto</a>
-  <a href="audit.html" class="active">📋 Audit</a>
-  <span id="version-badge" style="margin-left:auto;font-size:.75rem;font-family:monospace;padding:4px 10px;"></span>
-</nav>
+<nav id="site-nav"></nav>
 <div class="page">
 <h1>📋 Game Audit</h1>
 <p class="subtitle">Load a completed game's audit record and verify the commitment hashes independently.</p>

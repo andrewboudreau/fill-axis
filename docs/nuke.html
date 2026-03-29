@@ -28,16 +28,10 @@ button:hover{opacity:.83;}
 .dbg-key{color:var(--muted);min-width:140px;font-family:var(--mono);}
 code{background:var(--cell);padding:2px 6px;border-radius:3px;font-family:var(--mono);font-size:.85em;}
 </style>
+<script src="engine/nav.js"></script>
 </head>
 <body>
-<nav>
-  <a href="lobby.html">🏠 Lobby</a>
-  <a href="rules.html">📖 Rules</a>
-  <a href="crypto-demo.html">🔐 Crypto</a>
-  <a href="audit.html">📋 Audit</a>
-  <a href="nuke.html" class="active">💥 Nuke</a>
-  <span id="version-badge" style="margin-left:auto;font-size:.75rem;font-family:monospace;padding:4px 10px;"></span>
-</nav>
+<nav id="site-nav"></nav>
 <div class="page">
   <h1>💥 Nuke</h1>
   <p class="subtitle">Developer reset — clears ALL local state and tombstones known games in blob storage.</p>
