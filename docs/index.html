@@ -143,9 +143,9 @@
     <div class="card">
       <h2>Board Size</h2>
       <select id="board-size">
-        <option value="4">4×4 — Quick (4 pieces each)</option>
+        <option value="4" selected>4×4 — Quick (4 pieces each)</option>
         <option value="6">6×6 — Standard (8 pieces each)</option>
-        <option value="8" selected>8×8 — Full (16 pieces each)</option>
+        <option value="8">8×8 — Full (16 pieces each)</option>
       </select>
     </div>
     <div class="card">
@@ -400,10 +400,13 @@ function finishGame() {
   let winner = null;
   let reason = 'by Territory';
 
-  // Win by General: need 2+ king advantage or opponent has 0
-  if (kings[0] - kings[1] >= 2 || (kings[1] === 0 && kings[0] > 0)) {
+  const kingsPerPlayer = getPieceCountsForSize(G.size).KING;
+  // Win by General: on 4x4 (1 king each), losing your king is enough
+  // On larger boards, need 2+ king advantage or opponent has 0
+  const kingThreshold = kingsPerPlayer === 1 ? 1 : 2;
+  if (kings[0] - kings[1] >= kingThreshold || (kings[1] === 0 && kings[0] > 0)) {
     winner = 0; reason = 'by General';
-  } else if (kings[1] - kings[0] >= 2 || (kings[0] === 0 && kings[1] > 0)) {
+  } else if (kings[1] - kings[0] >= kingThreshold || (kings[0] === 0 && kings[1] > 0)) {
     winner = 1; reason = 'by General';
   } else {
     if (territory[0] > territory[1]) winner = 0;
@@ -468,6 +471,8 @@ function moveDragGhost(e) {
 function endDrag(e) {
   ghost.style.display = 'none';
   if (!drag) return;
+  const savedDrag = drag;
+  drag = null; // clear first so renderBoard doesn't show drop targets
   const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
   const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
   const el = document.elementFromPoint(clientX, clientY);
@@ -475,19 +480,20 @@ function endDrag(e) {
   if (cell) {
     const x = parseInt(cell.dataset.x);
     const y = parseInt(cell.dataset.y);
-    if (placePiece(x, y, drag.type, drag.team)) {
-      renderGame();
-      // Auto end turn if all tiles for this turn placed
-      if (G.tilesPlacedThisTurn >= G.tilesPerTurn) {
-        if (G.mode === 'local') {
-          setTimeout(() => endTurn(), 400);
-        } else {
-          document.getElementById('finish-btn').style.display = '';
+    // Always call window.placePiece so P2P patch applies
+    const ok = window.placePiece(x, y, savedDrag.type, savedDrag.team);
+    if (ok) {
+      if (G.mode === 'local') {
+        renderGame();
+        if (G.tilesPlacedThisTurn >= G.tilesPerTurn) {
+          // Give player a moment to see the placement before switching
+          setTimeout(() => { endTurn(); renderGame(); }, 600);
         }
+      } else {
+        renderGame();
       }
     }
   }
-  drag = null;
 }
 
 document.addEventListener('mousemove', e => drag && moveDragGhost(e));
@@ -581,11 +587,19 @@ function renderBoard() {
       if (piece) {
         const token = document.createElement('div');
         token.className = 'tile-token';
-        if (piece.hidden && piece.team !== G.currentTeam) {
+        // Show as hidden if: still in placement phase AND it's the opponent's piece
+        // In local mode, "opponent" = the team whose turn it is NOT (fog of war for same-screen)
+        // In p2p mode, "opponent" = the remote player (always 1-myTeam)
+        const isOpponentPiece = G.mode === 'p2p'
+          ? piece.team !== myTeam
+          : piece.team !== G.currentTeam;
+        const showHidden = piece.hidden && isOpponentPiece && G.phase === 'PLACEMENT';
+        if (showHidden) {
           token.classList.add('tile-hidden');
           token.textContent = '?';
         } else {
           token.classList.add(piece.team === 0 ? 'tile-p1' : 'tile-p2');
+          if (piece.dead) token.classList.add('tile-dead');
           token.textContent = PIECE_TYPES[piece.type].icon;
           token.style.color = piece.team === 0 ? 'var(--p1)' : 'var(--p2)';
         }
@@ -779,28 +793,24 @@ document.getElementById('finish-btn').addEventListener('click', () => {
   }
 });
 
-// Patch placePiece to auto-send in p2p mode
+// Patch placePiece so P2P sends moves to peer; local turn logic is handled in endDrag
 const _origPlacePiece = placePiece;
 window.placePiece = function(x, y, type, team) {
   const ok = _origPlacePiece(x, y, type, team);
   if (ok && G && G.mode === 'p2p') {
     sendMsg({ type: 'PLACE', x, y, pieceType: type });
-    // Show finish btn when enough placed
     if (G.tilesPlacedThisTurn >= G.tilesPerTurn) {
       document.getElementById('finish-btn').style.display = '';
-    }
-  } else if (ok && G && G.mode === 'local') {
-    if (G.tilesPlacedThisTurn >= G.tilesPerTurn) {
-      setTimeout(() => { endTurn(); renderGame(); }, 400);
     }
   }
   return ok;
 };
 
-// Also restrict dragging to myTeam in p2p mode
+// Restrict dragging to myTeam in p2p mode only; local uses currentTeam check in startDrag
 const _origStartDrag = startDrag;
 window.startDrag = function(type, team, e) {
   if (G && G.mode === 'p2p' && team !== myTeam) return;
+  // In local mode, startDrag already checks G.currentTeam === team
   _origStartDrag(type, team, e);
 };
 
