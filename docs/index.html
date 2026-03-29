@@ -7,6 +7,7 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="engine/crypto.js"></script>
 <script src="engine/storage.js"></script>
+<script src="engine/debug.js"></script>
 <style>
   :root {
     --bg: #1a1a2e;
@@ -376,6 +377,7 @@ function endTurn() {
 
 function startReveal() {
   G.phase = 'REVEAL';
+  window.__debug.event('REVEAL', `${G.pieces.length} pieces unhidden`);
   // Unhide all pieces
   for (const p of G.pieces) p.hidden = false;
   renderGame();
@@ -784,6 +786,7 @@ function sendMsg(obj) {
 function handleMessage(raw) {
   let msg;
   try { msg = JSON.parse(raw); } catch(e) { return; }
+  window.__debug.log('recv', msg.type, msg);
 
   if (msg.type === 'JOIN') {
     clearTimeout(connectTimeout);
@@ -831,6 +834,9 @@ function handleMessage(raw) {
     if (!G || !opponentCommitment) return;
     (async () => {
       const result = await verifyCommitment(msg.pieces, msg.salt, opponentCommitment);
+      window.__debug.event(result.valid ? 'VERIFY ✅' : 'VERIFY ❌',
+        result.valid ? `hash match: ${result.actualHash?.slice(0,16)}...` : result.error,
+        result.valid ? 'event' : 'error');
       if (!result.valid) {
         showVerifyResult(false, result.error);
         return;

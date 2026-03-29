@@ -11,6 +11,7 @@
 <script src="engine/board.js"></script>
 <script src="engine/game.js"></script>
 <script src="engine/async-game.js"></script>
+<script src="engine/debug.js"></script>
 <style>
 :root{--bg:#1a1a2e;--panel:#16213e;--border:#0f3460;--accent:#e94560;--p1:#4fc3f7;--p1bg:rgba(79,195,247,.1);
   --p2:#ff8a65;--p2bg:rgba(255,138,101,.1);--green:#69f0ae;--yellow:#ffd54f;--red:#ff5252;
@@ -136,9 +137,11 @@ async function boot() {
   myDeviceId = getDeviceId();
   myName = getDisplayName();
   myKeyPair = await getKeyPair();
+  window.__debug.event('BOOT', `deviceId=${myDeviceId.slice(0,8)}... name=${myName}`);
   blob = await asyncLoadGame(GAME_CODE);
   if (!blob) { setStatus('Game not found: ' + GAME_CODE, true); return; }
   myTeam = blob.players.findIndex(p => p?.deviceId === myDeviceId);
+  window.__debug.event('GAME LOADED', `phase=${blob.phase} myTeam=${myTeam} code=${GAME_CODE}`);
   if (myTeam < 0) { setStatus("You're not a player in this game.", true); return; }
   addActiveGame(GAME_CODE);
   renderPhase();
@@ -256,6 +259,9 @@ async function phaseRevealed() {
 
   // Verify opponent's reveal
   const result = await asyncVerifyReveal(blob, 1 - myTeam);
+  window.__debug.event(result.valid ? 'VERIFY ✅' : 'VERIFY ❌',
+    result.valid ? `boardStr=${result.boardStr?.slice(0,30)}...` : result.error,
+    result.valid ? 'event' : 'error');
   if (!result.valid) {
     document.getElementById('phase-ui').innerHTML = `
       <div class="phase-card">
@@ -366,6 +372,7 @@ function renderPlacementActions(isMyTurn, tilesPerTurn) {
 
 async function endPlacementTurn() {
   setStatus('Submitting turn...', false);
+  window.__debug.event('END TURN', `pieces=${localState.pieces.length} tray=${JSON.stringify(localState.tray)}`);
   // Check if all my pieces are placed
   const counts = getPieceCountsForSize(blob.boardSize);
   const total = Object.values(counts).reduce((a,b)=>a+b,0);
@@ -391,6 +398,7 @@ async function endPlacementTurn() {
 
 async function doReveal() {
   setStatus('Revealing board...', false);
+  window.__debug.event('REVEAL', `pieces=${localState.pieces.length} salt=${localState.salt?.slice(0,16)}...`);
   blob = await asyncSubmitReveal(GAME_CODE, myTeam, localState.pieces, localState.salt, myKeyPair.privateKey);
   renderPhase();
 }
