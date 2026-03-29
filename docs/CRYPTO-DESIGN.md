@@ -171,12 +171,19 @@ All async. Uses browser Web Crypto API — no external dependencies.
 
 ## POC Status
 
-- [x] `engine/crypto.js` — full implementation
-- [x] `crypto-demo.html` — interactive demo (commitment + ECDSA chain)
-- [ ] Wire commitment exchange into PeerJS P2P game flow
-- [ ] Add verification step before battle resolve in P2P mode
-- [ ] Persist chain to sessionStorage for post-game audit
-- [ ] Blob store integration for async fair exchange (future)
+- [x] `engine/crypto.js` — SHA-256, ECDSA sign/verify, commitment scheme
+- [x] `crypto-demo.html` — interactive commitment + ECDSA chain demo
+- [x] Commitment exchange wired into PeerJS P2P game flow (`index.html`)
+- [x] Salt always included in audit records
+- [x] `engine/storage.js` — Azure Blob Storage via SAS URL (no SDK)
+- [x] `engine/identity.js` — device ID + ECDSA keypair, localStorage persistence
+- [x] `engine/async-game.js` — full async turn-based state machine over blob storage
+- [x] `lobby.html` — game overworld: identity, up to 5 active games, create/join
+- [x] `async.html` — async game view: placement → commit → reveal → verify → result
+- [x] `audit.html` — post-game audit viewer with commitment re-verification
+- [ ] Wire commitment exchange into async game verify step (currently uses asyncVerifyReveal)
+- [ ] Blob-encrypted fair exchange for async (documented, not yet built)
+- [ ] Unit tests for engine modules
 
 ---
 

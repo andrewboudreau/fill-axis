@@ -21,6 +21,7 @@
   .tagline { color: var(--muted); font-size: 0.9rem; letter-spacing: 2px; margin-bottom: 36px; }
   h2 { font-size: 1.1rem; text-transform: uppercase; letter-spacing: 2px; color: var(--accent);
        border-bottom: 1px solid var(--border); padding-bottom: 8px; margin: 36px 0 16px; }
+  h3 { color: var(--text); margin: 16px 0 8px; font-size: 1rem; }
   p { color: var(--text); margin-bottom: 12px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
   th { background: var(--panel); color: var(--accent); text-align: left; padding: 10px 14px;
@@ -35,6 +36,19 @@
   .tag-p2 { background: rgba(255,138,101,0.18); color: var(--p2); }
   .note { background: var(--panel); border-left: 3px solid var(--accent); padding: 12px 16px;
           border-radius: 0 6px 6px 0; margin: 16px 0; font-size: 0.88rem; color: var(--muted); }
+  .mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  @media (max-width: 560px) { .mode-cards { grid-template-columns: 1fr; } }
+  .mode-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .mode-card h3 { margin-top: 0; margin-bottom: 8px; font-size: 1rem; }
+  .mode-card p { font-size: 0.88rem; color: var(--muted); margin-bottom: 12px; }
+  .mode-card a { display: inline-block; padding: 7px 16px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;
+                 text-decoration: none; background: rgba(233,69,96,0.15); color: var(--accent); border: 1px solid var(--accent); }
+  .mode-card a:hover { background: rgba(233,69,96,0.28); }
+  .mode-realtime h3 { color: var(--p1); }
+  .mode-realtime { border-color: var(--p1); }
+  .mode-async h3 { color: var(--p2); }
+  .mode-async { border-color: var(--p2); }
+  code { background: var(--cell); padding: 1px 5px; border-radius: 3px; font-size: 0.85em; color: var(--p1); }
 </style>
 </head>
 <body>
@@ -44,10 +58,27 @@
   <a href="attack-zones.html">⚔ Attack Zones</a>
   <a href="scoring.html">📊 Scoring</a>
   <a href="rules.html" class="active">📖 Rules</a>
+  <a href="crypto-demo.html">🔐 Crypto</a>
 </nav>
 <main>
   <h1>Fill Axis</h1>
   <div class="tagline">Rules Reference — Two-Player Territory Game</div>
+
+  <!-- HOW TO PLAY -->
+  <h2>How to Play</h2>
+  <p>Fill Axis can be played in two modes. Choose the one that fits your situation:</p>
+  <div class="mode-cards">
+    <div class="mode-card mode-realtime">
+      <h3>▶ Real-time (PeerJS)</h3>
+      <p>Same-screen local play, or host/join with a room code. Both players must be online simultaneously. Placement and reveal happen in one session.</p>
+      <a href="index.html">Open Real-time Game →</a>
+    </div>
+    <div class="mode-card mode-async">
+      <h3>⏳ Async / Turn-based</h3>
+      <p>Place on your own schedule — up to 5 games at once. Turns are stored to blob storage; no need to be online at the same time.</p>
+      <a href="lobby.html">Open Lobby →</a>
+    </div>
+  </div>
 
   <!-- OVERVIEW -->
   <h2>Overview</h2>
@@ -132,6 +163,10 @@
         (local mode) or you press <strong>End Turn →</strong> (multiplayer).</li>
     <li>When <em>both players</em> have placed all their pieces, the Reveal Phase begins.</li>
   </ol>
+  <div class="note">
+    <strong>Async mode:</strong> In turn-based games, each player's turn is stored to Azure Blob Storage after placement.
+    The opponent polls for updates when they open the game next — no need to be online simultaneously.
+  </div>
   <table>
     <thead><tr><th>Board</th><th>Tiles per Turn</th></tr></thead>
     <tbody>
@@ -180,7 +215,7 @@
   <h2>Win Conditions</h2>
   <p>There are two ways to win:</p>
 
-  <h3 style="color:var(--text);margin:16px 0 8px;font-size:1rem;">1. Win by General</h3>
+  <h3>1. Win by General</h3>
   <p>
     Destroy enough of the opponent's Generals. The threshold depends on board size:
   </p>
@@ -193,12 +228,50 @@
     </tbody>
   </table>
 
-  <h3 style="color:var(--text);margin:16px 0 8px;font-size:1rem;">2. Win by Territory</h3>
+  <h3>2. Win by Territory</h3>
   <p>
     If neither player achieves a General victory, the player who exclusively controls <strong>more
     cells</strong> wins. Contested cells (attacked equally by both sides) count for neither player.
     If territory is exactly equal, the game ends in a <strong>Draw</strong>.
   </p>
+
+  <!-- FAIR PLAY & CRYPTOGRAPHY -->
+  <h2>Fair Play &amp; Cryptography</h2>
+  <p>
+    Fill Axis uses a <strong>cryptographic commitment scheme</strong> to ensure neither player can
+    change their piece placement after seeing the opponent's board:
+  </p>
+  <ul>
+    <li>Before reveal, each player's board is hashed with a secret salt: <code>SHA-256(board + salt)</code>. Only the hash is shared — the board stays hidden.</li>
+    <li>The salt is kept secret until <em>after</em> the opponent has also committed. Once both hashes are exchanged, neither player can alter their placement without detection.</li>
+    <li>At reveal, both players send their board and salt. The opponent verifies the hash matches the earlier commitment — any tampering is immediately caught.</li>
+  </ul>
+  <div class="note">
+    After the game ends, both the commitment hash and the salt are saved to the audit record.
+    The secret is already revealed at this point, so including the salt allows anyone to re-verify
+    the game result. See <a href="crypto-demo.html" style="color:var(--accent)">🔐 Crypto Demo</a> for an interactive walkthrough.
+  </div>
+
+  <!-- DEVICE IDENTITY & PRIVACY -->
+  <h2>Device Identity &amp; Privacy</h2>
+  <p>Fill Axis uses a lightweight, server-free identity system:</p>
+  <ul>
+    <li><strong>One device = one player identity.</strong> On first visit, a random 32-byte ID and an ECDSA keypair are auto-generated in your browser.</li>
+    <li>Your identity is <strong>persisted in <code>localStorage</code></strong>. Clearing your browser storage permanently loses your identity — this is by design, keeping you in full control.</li>
+    <li>Share your <strong>device ID</strong> with opponents so they can recognize you across games.</li>
+    <li><strong>No account, no server, no login.</strong> Your keys never leave your device.</li>
+  </ul>
+
+  <!-- AUDIT & VERIFICATION -->
+  <h2>Audit &amp; Verification</h2>
+  <p>Every completed game produces a verifiable audit record:</p>
+  <ul>
+    <li>After every P2P or async game, an audit record is saved to blob storage automatically.</li>
+    <li>The record contains: both commitment hashes, both salts, all piece positions, and the winner.</li>
+    <li>Anyone with the room code can load and inspect it at <a href="audit.html" style="color:var(--accent)">📋 audit.html</a>.</li>
+    <li>The salt is always included in the audit record — the game is over, so the secret has already been revealed and there is nothing left to hide.</li>
+  </ul>
+
 </main>
 </body>
 </html>

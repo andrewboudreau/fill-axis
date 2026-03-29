@@ -23,7 +23,12 @@
            border-radius: 8px; padding: 10px 20px; font-size: 1rem; font-weight: 700; transition: border-color 0.15s, color 0.15s; }
   button:hover { border-color: var(--accent); color: var(--accent); }
   button.selected { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.12); }
-  #grid { display: grid; grid-template-columns: repeat(4, 80px); gap: 4px; }
+  .size-btns { display: flex; gap: 8px; }
+  .size-btn { cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text);
+              border-radius: 8px; padding: 8px 18px; font-size: 0.9rem; font-weight: 700; transition: border-color 0.15s, color 0.15s; }
+  .size-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .size-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.12); }
+  #grid { display: grid; gap: 4px; }
   .cell { width: 80px; height: 80px; background: var(--cell); border: 1px solid #1e3050; border-radius: 4px;
           display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
           cursor: pointer; transition: background 0.1s; user-select: none; }
@@ -47,6 +52,12 @@
   <h1>Attack Zone Demo</h1>
   <p class="sub">Select a piece type, then click a cell to see its attack range</p>
 
+  <div class="size-btns" id="size-btns">
+    <button class="size-btn selected" data-size="4">4×4</button>
+    <button class="size-btn" data-size="6">6×6</button>
+    <button class="size-btn" data-size="8">8×8</button>
+  </div>
+
   <div class="btn-row" id="piece-btns"></div>
 
   <div id="grid"></div>
@@ -55,8 +66,20 @@
 
 <script src="engine/pieces.js"></script>
 <script>
-  const SIZE = 4;
+  let SIZE = 4;
   let selected = null; // currently selected piece type key
+
+  // Size selector buttons
+  document.querySelectorAll('.size-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      SIZE = parseInt(btn.dataset.size);
+      document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      buildGrid();
+      clearGrid();
+      document.getElementById('hint').textContent = '← Choose a piece type above';
+    });
+  });
 
   // Build piece buttons
   const btnRow = document.getElementById('piece-btns');
@@ -75,15 +98,23 @@
   }
 
   // Build grid (y from SIZE-1 down to 0, x left to right)
-  const grid = document.getElementById('grid');
-  for (let y = SIZE - 1; y >= 0; y--) {
-    for (let x = 0; x < SIZE; x++) {
-      const cell = document.createElement('div');
-      cell.className = 'cell';
-      cell.dataset.x = x;
-      cell.dataset.y = y;
-      cell.addEventListener('click', () => onCellClick(x, y, cell));
-      grid.appendChild(cell);
+  function buildGrid() {
+    const cellSize = SIZE <= 4 ? 80 : SIZE <= 6 ? 68 : 56;
+    const grid = document.getElementById('grid');
+    grid.style.gridTemplateColumns = `repeat(${SIZE}, ${cellSize}px)`;
+    grid.innerHTML = '';
+    for (let y = SIZE - 1; y >= 0; y--) {
+      for (let x = 0; x < SIZE; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.width = cellSize + 'px';
+        cell.style.height = cellSize + 'px';
+        cell.style.fontSize = SIZE <= 4 ? '1.8rem' : SIZE <= 6 ? '1.4rem' : '1.1rem';
+        cell.dataset.x = x;
+        cell.dataset.y = y;
+        cell.addEventListener('click', () => onCellClick(x, y, cell));
+        grid.appendChild(cell);
+      }
     }
   }
 
@@ -112,6 +143,9 @@
     document.getElementById('hint').textContent =
       `${info.name} at (${x},${y}) attacks ${attacked.length} cell(s) — ${info.desc}`;
   }
+
+  // Initial build
+  buildGrid();
 </script>
 </body>
 </html>

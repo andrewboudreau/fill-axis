@@ -118,6 +118,15 @@ table{width:100%;border-collapse:collapse;font-size:.85rem;}
 th{color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-size:.72rem;padding:6px 10px;border-bottom:1px solid var(--border);text-align:left;}
 td{padding:8px 10px;border-bottom:1px solid #1a2840;vertical-align:top;}
 td code{font-family:var(--mono);font-size:.78rem;color:var(--yellow);}
+details { margin: 10px 0; }
+details summary { cursor: pointer; color: var(--muted); font-size: .85rem; padding: 8px 12px;
+  background: var(--cell); border: 1px solid var(--border); border-radius: 6px;
+  user-select: none; list-style: none; }
+details summary::-webkit-details-marker { display: none; }
+details summary::before { content: '▶ '; font-size: .75rem; }
+details[open] summary::before { content: '▼ '; }
+details[open] summary { border-radius: 6px 6px 0 0; border-bottom-color: transparent; }
+details .mermaid-wrap { border-radius: 0 0 6px 6px; margin: 0; }
 </style>
 </head>
 <body>
@@ -138,6 +147,8 @@ td code{font-family:var(--mono);font-size:.78rem;color:var(--yellow);}
 <section>
   <div class="card">
     <h2>Protocol Flow</h2>
+    <details>
+    <summary>📊 Show Protocol Sequence Diagram</summary>
     <div class="mermaid-wrap">
       <div class="mermaid">
 sequenceDiagram
@@ -174,6 +185,7 @@ sequenceDiagram
     end
       </div>
     </div>
+    </details>
   </div>
 </section>
 
@@ -364,6 +376,8 @@ sequenceDiagram
       In a <em>real-time</em> game both players are online at reveal — disconnect = forfeit solves the problem.
       For <em>async</em> play (email chess style) you need a different protocol. This is the "both deposit" idea you described.
     </p>
+    <details>
+    <summary>📊 Show Async Fair Exchange Diagram</summary>
     <div class="mermaid-wrap" style="margin-bottom:14px;">
       <div class="mermaid">
 sequenceDiagram
@@ -391,6 +405,7 @@ sequenceDiagram
     P2->>P2: decrypt sealed₁ with P1 key → verify commitment
       </div>
     </div>
+    </details>
     <div class="card" style="background:var(--cell)">
       <h3>Why this works</h3>
       <p class="note">

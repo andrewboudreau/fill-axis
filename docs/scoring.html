@@ -53,6 +53,11 @@
   button.btn-secondary { cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text);
     border-radius: 8px; padding: 10px 22px; font-size: 0.9rem; font-weight: 600; transition: border-color 0.15s; margin-top: 4px; }
   button.btn-secondary:hover { border-color: var(--accent); }
+  .size-btns { display: flex; gap: 8px; }
+  .size-btn { cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text);
+              border-radius: 8px; padding: 8px 18px; font-size: 0.9rem; font-weight: 700; transition: border-color 0.15s, color 0.15s; }
+  .size-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .size-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.12); }
 </style>
 </head>
 <body>
@@ -67,7 +72,13 @@
 </nav>
 <div id="app">
   <h1>Scoring Demo</h1>
-  <p class="sub">A pre-set 4×4 board. Hit <strong>Resolve Battle</strong> to run elimination rounds and see territory scoring live.</p>
+  <p class="sub">A pre-set board. Hit <strong>Resolve Battle</strong> to run elimination rounds and see territory scoring live.</p>
+
+  <div class="size-btns" id="size-btns">
+    <button class="size-btn selected" data-size="4">4×4</button>
+    <button class="size-btn" data-size="6">6×6</button>
+    <button class="size-btn" data-size="8">8×8</button>
+  </div>
 
   <div class="scores">
     <div class="score-box p1"><div class="score-val" id="score-0">0</div><div class="score-name">Blue</div></div>
@@ -91,23 +102,70 @@
 <script src="engine/pieces.js"></script>
 <script src="engine/board.js"></script>
 <script>
-  const SIZE = 4;
+  let SIZE = 4;
 
-  // Pre-set pieces: 3 per side on a 4×4 board
-  // team 0 = Blue, team 1 = Orange
-  const INITIAL_PIECES = [
-    { x: 0, y: 3, type: 'KING', team: 0 },
-    { x: 1, y: 1, type: 'HORZ', team: 0 },
-    { x: 3, y: 2, type: 'VERT', team: 0 },
-    { x: 3, y: 0, type: 'KING', team: 1 },
-    { x: 2, y: 3, type: 'X',    team: 1 },
-    { x: 0, y: 0, type: 'VERT', team: 1 },
-  ];
+  // Pre-set pieces per board size
+  const PRESETS = {
+    4: [
+      { x: 0, y: 3, type: 'KING', team: 0 },
+      { x: 1, y: 1, type: 'HORZ', team: 0 },
+      { x: 3, y: 2, type: 'VERT', team: 0 },
+      { x: 3, y: 0, type: 'KING', team: 1 },
+      { x: 2, y: 3, type: 'X',    team: 1 },
+      { x: 0, y: 0, type: 'VERT', team: 1 },
+    ],
+    6: [
+      { x: 0, y: 5, type: 'KING', team: 0 },
+      { x: 2, y: 4, type: 'HORZ', team: 0 },
+      { x: 1, y: 2, type: 'VERT', team: 0 },
+      { x: 3, y: 3, type: 'X',    team: 0 },
+      { x: 4, y: 5, type: 'KING', team: 0 },
+      { x: 5, y: 1, type: 'HORZ', team: 0 },
+      { x: 5, y: 5, type: 'KING', team: 1 },
+      { x: 3, y: 1, type: 'HORZ', team: 1 },
+      { x: 4, y: 3, type: 'VERT', team: 1 },
+      { x: 2, y: 2, type: 'X',    team: 1 },
+      { x: 1, y: 4, type: 'KING', team: 1 },
+      { x: 0, y: 0, type: 'VERT', team: 1 },
+    ],
+    8: [
+      { x: 0, y: 7, type: 'KING', team: 0 },
+      { x: 2, y: 6, type: 'HORZ', team: 0 },
+      { x: 1, y: 4, type: 'VERT', team: 0 },
+      { x: 3, y: 5, type: 'X',    team: 0 },
+      { x: 4, y: 7, type: 'KING', team: 0 },
+      { x: 6, y: 6, type: 'HORZ', team: 0 },
+      { x: 5, y: 4, type: 'VERT', team: 0 },
+      { x: 7, y: 5, type: 'X',    team: 0 },
+      { x: 0, y: 0, type: 'KING', team: 1 },
+      { x: 2, y: 1, type: 'HORZ', team: 1 },
+      { x: 1, y: 3, type: 'VERT', team: 1 },
+      { x: 3, y: 2, type: 'X',    team: 1 },
+      { x: 4, y: 0, type: 'KING', team: 1 },
+      { x: 6, y: 1, type: 'HORZ', team: 1 },
+      { x: 5, y: 3, type: 'VERT', team: 1 },
+      { x: 7, y: 2, type: 'X',    team: 1 },
+    ],
+  };
 
   let pieces = [];
 
+  // Size selector
+  document.querySelectorAll('.size-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      SIZE = parseInt(btn.dataset.size);
+      document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      resetPieces();
+      renderBoard();
+      document.getElementById('winner-msg').textContent = '';
+      document.getElementById('log').textContent = '';
+      document.getElementById('btn-resolve').disabled = false;
+    });
+  });
+
   function resetPieces() {
-    pieces = INITIAL_PIECES.map(p => ({ ...p, dead: false, hidden: false }));
+    pieces = (PRESETS[SIZE] || PRESETS[4]).map(p => ({ ...p, dead: false, hidden: false }));
   }
 
   function renderBoard() {
@@ -116,12 +174,20 @@
     document.getElementById('score-0').textContent = t[0];
     document.getElementById('score-1').textContent = t[1];
 
+    const cellSize = SIZE <= 4 ? 72 : SIZE <= 6 ? 60 : 48;
+    const tokenSize = SIZE <= 4 ? 52 : SIZE <= 6 ? 42 : 34;
+    const fontSize  = SIZE <= 4 ? '1.5rem' : SIZE <= 6 ? '1.2rem' : '1rem';
+
     const grid = document.getElementById('grid');
+    grid.style.gridTemplateColumns = `repeat(${SIZE}, ${cellSize}px)`;
     grid.innerHTML = '';
     for (let y = SIZE - 1; y >= 0; y--) {
       for (let x = 0; x < SIZE; x++) {
         const cell = document.createElement('div');
         cell.className = 'cell';
+        cell.style.width = cellSize + 'px';
+        cell.style.height = cellSize + 'px';
+        cell.style.fontSize = fontSize;
         cell.dataset.x = x; cell.dataset.y = y;
 
         const atk = map[x][y];
@@ -133,6 +199,9 @@
         if (piece) {
           const token = document.createElement('div');
           token.className = 'tile-token ' + (piece.team === 0 ? 'tile-p1' : 'tile-p2');
+          token.style.width = tokenSize + 'px';
+          token.style.height = tokenSize + 'px';
+          token.style.fontSize = fontSize;
           if (piece.dead) token.classList.add('tile-dead');
           token.textContent = PIECE_TYPES[piece.type].icon;
           cell.appendChild(token);
