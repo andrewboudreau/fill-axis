@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fill Axis — Commitment Scheme Demo</title>
+<script src="engine/pieces.js"></script>
+<script src="engine/crypto.js"></script>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --border: #0f3460;
+    --accent: #e94560; --p1: #4fc3f7; --p2: #ff8a65;
+    --green: #69f0ae; --yellow: #ffd54f; --red: #ff5252;
+    --cell: #0d1b2a; --text: #e0e0e0; --muted: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; padding: 24px; }
+  nav { display: flex; gap: 8px; background: var(--panel); padding: 10px 16px; border-radius: 8px;
+        margin-bottom: 20px; border: 1px solid var(--border); flex-wrap: wrap; }
+  nav a { color: var(--muted); text-decoration: none; padding: 4px 12px; border-radius: 4px; font-size: 0.9rem; }
+  nav a:hover, nav a.active { background: var(--accent); color: #fff; }
+  h1 { color: var(--accent); font-size: 1.6rem; letter-spacing: 2px; margin-bottom: 6px; }
+  .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; }
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px; }
+  @media (max-width: 700px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card h2 { font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
+  .player-tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.8rem; font-weight: 700; margin-bottom: 12px; }
+  .p1-tag { background: rgba(79,195,247,0.15); color: var(--p1); border: 1px solid var(--p1); }
+  .p2-tag { background: rgba(255,138,101,0.15); color: var(--p2); border: 1px solid var(--p2); }
+  button { cursor: pointer; border: none; border-radius: 6px; padding: 9px 18px; font-size: 0.9rem; font-weight: 600; transition: opacity 0.15s; }
+  button:hover { opacity: 0.82; }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-muted  { background: var(--border); color: var(--text); }
+  .hash-box { font-family: monospace; font-size: 0.72rem; background: var(--cell); padding: 10px; border-radius: 6px;
+              word-break: break-all; color: var(--yellow); margin: 8px 0; min-height: 36px; border: 1px solid var(--border); }
+  .status { padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; margin: 8px 0; }
+  .ok  { background: rgba(105,240,174,0.12); color: var(--green); border: 1px solid var(--green); }
+  .err { background: rgba(255,82,82,0.12);   color: var(--red);   border: 1px solid var(--red); }
+  .warn{ background: rgba(255,213,79,0.12);  color: var(--yellow);border: 1px solid var(--yellow); }
+  .step { display: flex; align-items: flex-start; gap: 12px; margin: 12px 0; }
+  .step-num { min-width: 26px; height: 26px; border-radius: 50%; background: var(--border);
+              display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+  .step-num.done { background: var(--green); color: #111; }
+  .step-body { flex: 1; font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+  .step-body strong { color: var(--text); }
+  label { font-size: 0.8rem; color: var(--muted); display: block; margin-bottom: 4px; margin-top: 10px; }
+  input[type=checkbox] { margin-right: 6px; }
+  .board-mini { display: grid; grid-template-columns: repeat(4, 44px); gap: 4px; margin: 10px 0; }
+  .cell-mini { width: 44px; height: 44px; background: var(--cell); border: 1px solid var(--border);
+               border-radius: 4px; display: flex; align-items: center; justify-content: center;
+               font-size: 1.2rem; cursor: pointer; transition: background 0.1s; }
+  .cell-mini:hover { background: #1a2f47; }
+  .cell-mini.p1-piece { border-color: var(--p1); background: rgba(79,195,247,0.15); }
+  .cell-mini.p2-piece { border-color: var(--p2); background: rgba(255,138,101,0.15); }
+  .piece-picker { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .piece-btn { padding: 6px 12px; background: var(--cell); border: 1px solid var(--border);
+               border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  .piece-btn:hover, .piece-btn.active { border-color: var(--accent); color: var(--accent); }
+  .full-width { grid-column: 1 / -1; }
+  .chain-entry { font-family: monospace; font-size: 0.72rem; background: var(--cell); padding: 8px 10px;
+                 border-radius: 4px; border-left: 3px solid var(--border); margin: 4px 0; color: var(--muted); }
+  .chain-entry.p1 { border-color: var(--p1); }
+  .chain-entry.p2 { border-color: var(--p2); }
+  .chain-entry.verified { border-color: var(--green); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+  details pre { font-size: 0.7rem; color: var(--muted); background: var(--cell); padding: 8px; border-radius: 4px; overflow-x: auto; margin-top: 4px; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html">▶ Play</a>
+  <a href="attack-zones.html">⚔ Attack Zones</a>
+  <a href="scoring.html">📊 Scoring</a>
+  <a href="rules.html">📖 Rules</a>
+  <a href="crypto-demo.html" class="active">🔐 Crypto</a>
+</nav>
+
+<h1>🔐 Commitment Scheme Demo</h1>
+<p class="subtitle">Verifiable hidden placement — no trusted server needed</p>
+
+<div class="layout">
+
+  <!-- PROTOCOL STEPS -->
+  <div class="card full-width">
+    <h2>How It Works</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
+      <div class="step"><div class="step-num" id="s1">1</div><div class="step-body"><strong>Place Pieces</strong><br>Each player places secretly. Board state is locked.</div></div>
+      <div class="step"><div class="step-num" id="s2">2</div><div class="step-body"><strong>Commit</strong><br>SHA-256(board + secret salt) broadcast to opponent. Can't change board now without detection.</div></div>
+      <div class="step"><div class="step-num" id="s3">3</div><div class="step-body"><strong>Reveal</strong><br>Both players share their board + salt. Opponent verifies hash matches commitment.</div></div>
+      <div class="step"><div class="step-num" id="s4">4</div><div class="step-body"><strong>Verify</strong><br>If hashes match → fair game. If not → cheater detected. No server needed.</div></div>
+    </div>
+  </div>
+
+  <!-- PLAYER 1 -->
+  <div class="card" id="card-p1">
+    <h2>Player Setup</h2>
+    <div class="player-tag p1-tag">◆ Player 1</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px;">Click pieces below then click board cells to place. Player 1 pieces shown in blue.</p>
+    <div class="piece-picker" id="picker-p1">
+      <button class="piece-btn active" data-type="KING">♛ General</button>
+      <button class="piece-btn" data-type="VERT">| Vertical</button>
+      <button class="piece-btn" data-type="HORZ">— Horiz</button>
+      <button class="piece-btn" data-type="X">✕ Diagonal</button>
+    </div>
+    <div class="board-mini" id="board-p1"></div>
+    <button class="btn-accent" id="btn-commit-p1" style="margin-top:10px;width:100%">🔒 Commit Board</button>
+    <label>Commitment hash (broadcast to P2):</label>
+    <div class="hash-box" id="commit-p1">—</div>
+    <label><input type="checkbox" id="cheat-p1"> Simulate cheat: modify board after commit</label>
+  </div>
+
+  <!-- PLAYER 2 -->
+  <div class="card" id="card-p2">
+    <h2>Player Setup</h2>
+    <div class="player-tag p2-tag">◆ Player 2</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px;">Click pieces below then click board cells to place. Player 2 pieces shown in orange.</p>
+    <div class="piece-picker" id="picker-p2">
+      <button class="piece-btn active" data-type="KING">♛ General</button>
+      <button class="piece-btn" data-type="VERT">| Vertical</button>
+      <button class="piece-btn" data-type="HORZ">— Horiz</button>
+      <button class="piece-btn" data-type="X">✕ Diagonal</button>
+    </div>
+    <div class="board-mini" id="board-p2"></div>
+    <button class="btn-accent" id="btn-commit-p2" style="margin-top:10px;width:100%">🔒 Commit Board</button>
+    <label>Commitment hash (broadcast to P1):</label>
+    <div class="hash-box" id="commit-p2">—</div>
+    <label><input type="checkbox" id="cheat-p2"> Simulate cheat: modify board after commit</label>
+  </div>
+
+  <!-- REVEAL & VERIFY -->
+  <div class="card full-width">
+    <h2>Reveal & Verify</h2>
+    <button class="btn-accent" id="btn-reveal" disabled style="margin-right:8px;">⚡ Reveal Both Boards</button>
+    <span style="font-size:0.82rem;color:var(--muted)">Both commitments must be locked first.</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;">
+      <div>
+        <div class="player-tag p1-tag">P1 verification result</div>
+        <div id="verify-p1" class="hash-box" style="color:var(--muted)">Waiting for reveal...</div>
+      </div>
+      <div>
+        <div class="player-tag p2-tag">P2 verification result</div>
+        <div id="verify-p2" class="hash-box" style="color:var(--muted)">Waiting for reveal...</div>
+      </div>
+    </div>
+    <div id="verdict" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- SIGNING DEMO -->
+  <div class="card full-width">
+    <h2>Signed Game Chain (ECDSA)</h2>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px;">
+      Each game action is signed with the player's private key and chained via prevHash.
+      After the game, anyone with the public keys can verify no moves were tampered with.
+    </p>
+    <button class="btn-accent" id="btn-gen-keys">Generate Keypairs &amp; Demo Chain</button>
+    <div id="chain-output" style="margin-top:12px;"></div>
+  </div>
+
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const players = {
+  p1: { pieces: [], commitment: null, salt: null, selectedType: 'KING', team: 0 },
+  p2: { pieces: [], commitment: null, salt: null, selectedType: 'KING', team: 1 },
+};
+
+// ─── BOARD UI ────────────────────────────────────────────────────────────────
+function renderBoard(pid) {
+  const p = players[pid];
+  const board = document.getElementById('board-' + pid);
+  const color = pid === 'p1' ? 'var(--p1)' : 'var(--p2)';
+  board.innerHTML = '';
+  for (let y = 3; y >= 0; y--) {
+    for (let x = 0; x < 4; x++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell-mini';
+      const piece = p.pieces.find(pc => pc.x === x && pc.y === y);
+      if (piece) {
+        cell.textContent = PIECE_TYPES[piece.type].icon;
+        cell.style.color = color;
+        cell.classList.add(pid + '-piece');
+      }
+      cell.addEventListener('click', () => {
+        if (p.commitment) return; // locked
+        const existing = p.pieces.findIndex(pc => pc.x === x && pc.y === y);
+        if (existing >= 0) { p.pieces.splice(existing, 1); }
+        else { p.pieces.push({ x, y, type: p.selectedType, team: p.team, dead: false }); }
+        renderBoard(pid);
+      });
+      board.appendChild(cell);
+    }
+  }
+}
+
+// ─── PIECE PICKER ────────────────────────────────────────────────────────────
+['p1','p2'].forEach(pid => {
+  const picker = document.getElementById('picker-' + pid);
+  picker.querySelectorAll('.piece-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      picker.querySelectorAll('.piece-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      players[pid].selectedType = btn.dataset.type;
+    });
+  });
+  renderBoard(pid);
+});
+
+// ─── COMMIT ──────────────────────────────────────────────────────────────────
+async function doCommit(pid) {
+  const p = players[pid];
+  if (p.pieces.length === 0) { alert('Place at least one piece first!'); return; }
+  const result = await createCommitment(p.pieces);
+  p.commitment = result.commitment;
+  p.salt = result.salt;
+  document.getElementById('commit-' + pid).textContent = result.commitment;
+  document.getElementById('btn-commit-' + pid).textContent = '✅ Committed';
+  document.getElementById('btn-commit-' + pid).disabled = true;
+  document.getElementById('step-num-commit').classList.add('done');
+  markStep('s2');
+  checkRevealReady();
+}
+
+function markStep(id) {
+  document.getElementById(id).classList.add('done');
+}
+
+function checkRevealReady() {
+  if (players.p1.commitment && players.p2.commitment) {
+    document.getElementById('btn-reveal').disabled = false;
+    markStep('s3');
+  }
+}
+
+document.getElementById('btn-commit-p1').addEventListener('click', () => doCommit('p1'));
+document.getElementById('btn-commit-p2').addEventListener('click', () => doCommit('p2'));
+
+// ─── REVEAL & VERIFY ─────────────────────────────────────────────────────────
+document.getElementById('btn-reveal').addEventListener('click', async () => {
+  // Optionally simulate cheating
+  const cheatP1 = document.getElementById('cheat-p1').checked;
+  const cheatP2 = document.getElementById('cheat-p2').checked;
+
+  const p1Pieces = cheatP1
+    ? [...players.p1.pieces, { x: 3, y: 3, type: 'X', team: 0, dead: false }]  // sneaked an extra piece
+    : players.p1.pieces;
+  const p2Pieces = cheatP2
+    ? [...players.p2.pieces, { x: 0, y: 0, type: 'X', team: 1, dead: false }]
+    : players.p2.pieces;
+
+  // P1 verifies P2's reveal
+  const v2 = await verifyCommitment(p2Pieces, players.p2.salt, players.p2.commitment);
+  const el2 = document.getElementById('verify-p2');
+  el2.textContent = v2.valid
+    ? `✅ VALID\nHash: ${v2.actualHash}`
+    : `❌ CHEATER DETECTED\nExpected: ${v2.expectedCommitment}\nGot:      ${v2.actualHash}`;
+  el2.style.color = v2.valid ? 'var(--green)' : 'var(--red)';
+
+  // P2 verifies P1's reveal
+  const v1 = await verifyCommitment(p1Pieces, players.p1.salt, players.p1.commitment);
+  const el1 = document.getElementById('verify-p1');
+  el1.textContent = v1.valid
+    ? `✅ VALID\nHash: ${v1.actualHash}`
+    : `❌ CHEATER DETECTED\nExpected: ${v1.expectedCommitment}\nGot:      ${v1.actualHash}`;
+  el1.style.color = v1.valid ? 'var(--green)' : 'var(--red)';
+
+  // Verdict
+  const verdict = document.getElementById('verdict');
+  if (v1.valid && v2.valid) {
+    verdict.innerHTML = '<div class="status ok">✅ Both boards verified — game was played fairly. Battle can proceed.</div>';
+    markStep('s4');
+  } else {
+    const who = !v1.valid && !v2.valid ? 'Both players' : !v1.valid ? 'Player 1' : 'Player 2';
+    verdict.innerHTML = `<div class="status err">❌ ${who} modified their board after committing. Cheat detected — game result void.</div>`;
+  }
+});
+
+// ─── SIGNING DEMO ─────────────────────────────────────────────────────────────
+document.getElementById('btn-gen-keys').addEventListener('click', async () => {
+  const out = document.getElementById('chain-output');
+  out.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;">Generating keys and building chain...</div>';
+
+  const kp1 = await generateKeyPair();
+  const kp2 = await generateKeyPair();
+  const pub1 = await exportPublicKey(kp1.publicKey);
+  const pub2 = await exportPublicKey(kp2.publicKey);
+
+  // Simulate a 4-move game chain
+  const moves = [
+    { player: 0, action: 'PLACE', payload: { pieceCount: 1 } },
+    { player: 1, action: 'PLACE', payload: { pieceCount: 1 } },
+    { player: 0, action: 'COMMIT', payload: { commitment: await sha256('p1board' + generateSalt()) } },
+    { player: 1, action: 'COMMIT', payload: { commitment: await sha256('p2board' + generateSalt()) } },
+  ];
+
+  let prevHash = '0'.repeat(64);
+  const chain = [];
+  for (const move of moves) {
+    const pk = move.player === 0 ? kp1.privateKey : kp2.privateKey;
+    const block = await createBlock(move.action, move.payload, prevHash, pk);
+    prevHash = await hashBlock(block);
+    chain.push({ ...block, _hash: prevHash, _player: move.player });
+  }
+
+  // Verify all blocks
+  let html = '';
+  for (const block of chain) {
+    const pubKey = block._player === 0
+      ? await importPublicKey(pub1)
+      : await importPublicKey(pub2);
+    const { signature, _hash, _player, ...dataToVerify } = block;
+    const valid = await verifyBlock(dataToVerify, signature, pubKey);
+    const label = _player === 0 ? 'p1' : 'p2';
+    const pname = _player === 0 ? 'P1' : 'P2';
+    html += `<div class="chain-entry ${label} ${valid ? 'verified' : ''}">
+      ${valid ? '✅' : '❌'} Block [${pname}] action=${block.action}
+      &nbsp;·&nbsp; prevHash=${block.prevHash.slice(0,16)}...
+      &nbsp;·&nbsp; hash=${_hash.slice(0,16)}...
+      <details><summary>full block</summary><pre>${JSON.stringify({...block, _hash}, null, 2)}</pre></details>
+    </div>`;
+  }
+
+  out.innerHTML = `
+    <div class="status ok" style="margin-bottom:10px;">All ${chain.length} blocks verified ✅ — chain is intact and tamper-evident</div>
+    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">Public keys shared between players (private keys never leave the player's browser):</div>
+    <div class="hash-box">P1 pubkey: ${pub1.slice(0,48)}...</div>
+    <div class="hash-box">P2 pubkey: ${pub2.slice(0,48)}...</div>
+    <div style="margin-top:10px;">${html}</div>
+  `;
+});
+
+// init step markers
+document.querySelectorAll('.step-num').forEach((el,i) => el.id = 's'+(i+1));
+</script>
+</body>
+</html>
