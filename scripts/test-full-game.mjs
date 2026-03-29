@@ -8,19 +8,14 @@
 //   node scripts/test-full-game.mjs --size 4 --strategy greedy
 //   node scripts/test-full-game.mjs --code TESTX1  (resume existing game)
 
-import { createHash, webcrypto } from 'crypto';
-globalThis.crypto = webcrypto;
-
-// ─── POLYFILLS ────────────────────────────────────────────────────────────────
-globalThis.fetch = (await import('node:https')).request && (await import('node-fetch').catch(() => null))?.default
-  || (await import('node:fetch').catch(() => null))?.default;
-if (!globalThis.fetch) {
-  const { default: f } = await import('node-fetch').catch(async () => {
-    console.error('node-fetch not available, trying built-in fetch...');
-    return { default: null };
-  });
-  if (f) globalThis.fetch = f;
+import { createHash } from 'crypto';
+// Node 25+ has globalThis.crypto built in — only polyfill if missing
+if (!globalThis.crypto) {
+  const { webcrypto } = await import('crypto');
+  globalThis.crypto = webcrypto;
 }
+
+// Node 25+ has built-in fetch — no polyfill needed
 
 // ─── INLINE ENGINE (copy key functions from engine/*.js) ──────────────────────
 const STORAGE_BASE = 'https://belongtouspublic.blob.core.windows.net/fill-axis-games';
@@ -48,7 +43,7 @@ async function sha256(str) {
 }
 
 function generateSalt() {
-  const b = webcrypto.getRandomValues(new Uint8Array(32));
+  const b = globalThis.crypto.getRandomValues(new Uint8Array(32));
   return Array.from(b).map(x => x.toString(16).padStart(2,'0')).join('');
 }
 
