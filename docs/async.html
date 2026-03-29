@@ -97,6 +97,16 @@ button:hover{opacity:.83;}
   <!-- PHASE-SPECIFIC CARDS (shown/hidden per phase) -->
   <div id="phase-ui"></div>
 
+  <!-- MOVE HISTORY -->
+  <div id="move-history" style="display:none;margin-top:8px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      <span style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Move History</span>
+      <button onclick="document.getElementById('move-list').style.display=document.getElementById('move-list').style.display==='none'?'':'none'"
+        style="background:var(--cell);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:2px 8px;cursor:pointer;font-size:.75rem;">toggle</button>
+    </div>
+    <div id="move-list" style="display:none;max-height:200px;overflow-y:auto;background:var(--cell);border:1px solid var(--border);border-radius:6px;padding:8px;"></div>
+  </div>
+
   <!-- BOARD AREA -->
   <div id="game-ui" style="display:none">
     <div class="scores" id="scores" style="margin-bottom:12px;"></div>
@@ -151,6 +161,7 @@ async function boot() {
 function renderPhase() {
   const phase = blob.phase;
   document.getElementById('game-ui').style.display = 'none';
+  renderMoveHistory();
 
   if (phase === 'WAITING')    return phaseWaiting();
   if (phase === 'PLACEMENT')  return phasePlacement();
@@ -380,15 +391,19 @@ async function endPlacementTurn() {
   const allPlaced = myPieceCount >= total;
 
   if (allPlaced) {
-    // Commit
+    // All pieces placed — commit
     const boardStr = boardStateString(localState.pieces);
     const commitment = await sha256(boardStr + localState.salt);
-    blob = await asyncSubmitCommitment(GAME_CODE, myTeam, commitment, myPieceCount, myKeyPair.privateKey);
+    localState.tilesPlaced = 0; // reset for display
     saveLocalGameState(GAME_CODE, localState);
+    blob = await asyncSubmitCommitment(GAME_CODE, myTeam, commitment, myPieceCount, myKeyPair.privateKey);
     setStatus('Board committed. Waiting for opponent.', false);
   } else {
-    // Just end turn, advance to opponent
+    // End turn — reset placement quota for next round, advance to opponent
+    localState.tilesPlaced = 0;
+    saveLocalGameState(GAME_CODE, localState);
     blob.currentTeam = 1 - myTeam;
+    blob.turnNumber = (blob.turnNumber || 0) + 1;
     blob.updatedAt = new Date().toISOString();
     await blobWrite(asyncBlobName(GAME_CODE), blob);
     blob = await asyncLoadGame(GAME_CODE);
@@ -404,24 +419,41 @@ async function doReveal() {
 }
 
 // ─── BOARD RENDER ─────────────────────────────────────────────────────────────
+// Build the set of cells occupied by EITHER player (my pieces + opponent's known pieces from blob)
+function getOccupiedCells() {
+  const occ = new Set();
+  // My placed pieces
+  for (const p of (localState?.pieces || [])) occ.add(`${p.x},${p.y}`);
+  // Opponent's revealed pieces (if available in blob — placement phase only has count, not positions)
+  const oppRevealed = blob?.players?.[1 - myTeam]?.revealedPieces || [];
+  for (const p of oppRevealed) occ.add(`${p.x},${p.y}`);
+  return occ;
+}
+
 function renderBoard(size, interactive) {
   const board = document.getElementById('board');
   board.style.gridTemplateColumns = `repeat(${size}, 64px)`;
   board.innerHTML = '';
+  const occupied = getOccupiedCells();
+  const canDrop = interactive && drag && blob.currentTeam === myTeam &&
+    localState.tilesPlaced < localState.tilesPerTurn;
+
   for (let y = size-1; y>=0; y--) {
     for (let x=0; x<size; x++) {
       const cell = document.createElement('div');
       cell.className = 'cell';
       cell.dataset.x = x; cell.dataset.y = y;
-      const piece = localState?.pieces.find(p=>p.x===x&&p.y===y);
-      if (piece) {
+      const myPiece = localState?.pieces.find(p=>p.x===x&&p.y===y);
+      if (myPiece) {
         const t = document.createElement('div');
         t.className = 'tile tile-p' + (myTeam+1);
-        t.textContent = PIECE_TYPES_DATA[piece.type]?.icon || '?';
+        t.textContent = PIECE_TYPES_DATA[myPiece.type]?.icon || '?';
         t.style.color = myTeam===0 ? 'var(--p1)' : 'var(--p2)';
         cell.appendChild(t);
-      } else if (interactive && drag) {
+      } else if (canDrop && !occupied.has(`${x},${y}`)) {
         cell.classList.add('drop-ok');
+      } else if (canDrop && occupied.has(`${x},${y}`)) {
+        cell.classList.add('drop-bad');
       }
       board.appendChild(cell);
     }
@@ -458,22 +490,71 @@ let selectedType = 'KING';
 
 function renderTrays(size) {
   const myTray = document.getElementById('tray-mine');
+  const theirTray = document.getElementById('tray-theirs');
   while (myTray.children.length > 1) myTray.removeChild(myTray.lastChild);
-  document.getElementById('tray-mine-label').textContent = myName + ' (You)';
-  document.getElementById('tray-theirs-label').textContent = blob.players[1-myTeam]?.name || 'Opponent';
+  while (theirTray.children.length > 1) theirTray.removeChild(theirTray.lastChild);
 
-  const color = myTeam===0 ? 'var(--p1)' : 'var(--p2)';
+  document.getElementById('tray-mine-label').textContent = myName + ' (You)';
+  const oppName = blob.players[1-myTeam]?.name || 'Opponent';
+  document.getElementById('tray-theirs-label').textContent = oppName;
+
+  const isMyTurn = blob.currentTeam === myTeam;
+  const quotaLeft = localState.tilesPerTurn - localState.tilesPlaced;
+  const canDrag = isMyTurn && quotaLeft > 0;
+
+  const myColor  = myTeam===0 ? 'var(--p1)' : 'var(--p2)';
+  const oppColor = myTeam===0 ? 'var(--p2)' : 'var(--p1)';
+
+  // My tray
   for (const [type, info] of Object.entries(PIECE_TYPES_DATA)) {
     const count = localState.tray[type] || 0;
     const div = document.createElement('div');
-    div.className = 'piece-item' + (count===0?' empty':'');
-    div.innerHTML = `<span class="pi-icon" style="color:${color}">${info.icon}</span>
+    div.className = 'piece-item' + (count===0 || !canDrag ? ' empty' : '');
+    div.innerHTML = `<span class="pi-icon" style="color:${myColor}">${info.icon}</span>
       <span class="pi-info"><span class="pi-name">${info.name}</span><br><span class="pi-count">×${count}</span></span>`;
-    if (count > 0 && blob.currentTeam === myTeam) {
+    if (count > 0 && canDrag) {
+      div.classList.remove('empty');
       div.addEventListener('mousedown', e => { e.preventDefault(); startDrag(type, e); });
       div.addEventListener('touchstart', e => { e.preventDefault(); startDrag(type, e); }, {passive:false});
     }
     myTray.appendChild(div);
+  }
+
+  // Turn quota indicator
+  if (isMyTurn) {
+    const q = document.createElement('div');
+    q.style.cssText = 'font-size:.72rem;color:var(--muted);text-align:center;margin-top:6px;padding:4px;background:var(--cell);border-radius:4px;';
+    q.textContent = quotaLeft > 0 ? `Place ${quotaLeft} more` : 'Click End Turn →';
+    q.style.color = quotaLeft > 0 ? 'var(--yellow)' : 'var(--green)';
+    myTray.appendChild(q);
+  }
+
+  // Opponent tray — show how many hidden pieces they've placed this game
+  const oppPieceCount = blob.players[1-myTeam]?.pieceCount ?? 0;
+  const totalPieces = Object.values(getPieceCountsForSize(size)).reduce((a,b)=>a+b,0);
+  const oppRemaining = totalPieces - oppPieceCount;
+
+  const oppInfo = document.createElement('div');
+  oppInfo.style.cssText = 'font-size:.75rem;color:var(--muted);padding:6px 4px;';
+  oppInfo.innerHTML = `<div style="margin-bottom:6px;color:${oppColor}">${oppPieceCount} placed</div>
+    <div style="color:var(--muted)">${oppRemaining} remaining</div>`;
+  theirTray.appendChild(oppInfo);
+
+  // Show hidden piece tokens for each committed opponent piece
+  for (let i = 0; i < oppPieceCount; i++) {
+    const div = document.createElement('div');
+    div.className = 'piece-item';
+    div.style.cursor = 'default';
+    div.innerHTML = `<span class="pi-icon" style="color:#2a3a50">?</span>
+      <span class="pi-info"><span class="pi-name" style="color:#2a3a50">Hidden</span><br><span class="pi-count" style="color:#2a3a50">placed</span></span>`;
+    theirTray.appendChild(div);
+  }
+
+  if (!blob.players[1-myTeam]) {
+    const w = document.createElement('div');
+    w.style.cssText = 'font-size:.75rem;color:var(--muted);padding:8px 4px;';
+    w.textContent = 'Waiting for player 2...';
+    theirTray.appendChild(w);
   }
 }
 
@@ -511,25 +592,32 @@ function endDrag(e) {
   ghost.style.display='none';
   if (!drag) return;
   const savedDrag = drag; drag = null;
+
+  // Enforce: only current player can place, and only up to tilesPerTurn per turn
+  if (blob.currentTeam !== myTeam) { renderBoard(blob.boardSize, false); return; }
+  if (localState.tilesPlaced >= localState.tilesPerTurn) { renderBoard(blob.boardSize, false); return; }
+
   const cx = e.changedTouches?e.changedTouches[0].clientX:e.clientX;
   const cy = e.changedTouches?e.changedTouches[0].clientY:e.clientY;
   const el = document.elementFromPoint(cx, cy);
   const cell = el&&(el.classList.contains('cell')?el:el.closest('.cell'));
   if (cell) {
     const x=parseInt(cell.dataset.x), y=parseInt(cell.dataset.y);
-    const occ = localState.pieces.find(p=>p.x===x&&p.y===y);
-    if (!occ && localState.tray[savedDrag] > 0) {
+    const occupied = getOccupiedCells(); // checks both players' pieces
+    if (!occupied.has(`${x},${y}`) && localState.tray[savedDrag] > 0) {
       localState.pieces.push({x,y,type:savedDrag,team:myTeam,dead:false});
       localState.tray[savedDrag]--;
       localState.tilesPlaced++;
       saveLocalGameState(GAME_CODE, localState);
-      renderBoard(blob.boardSize, true);
+      window.__debug.event('PLACE', `${savedDrag} at (${x},${y}) tilesPlaced=${localState.tilesPlaced}/${localState.tilesPerTurn}`);
+      renderBoard(blob.boardSize, localState.tilesPlaced < localState.tilesPerTurn);
       renderTrays(blob.boardSize);
       renderScores();
       renderPlacementActions(true, localState.tilesPerTurn);
+      return;
     }
   }
-  renderBoard(blob.boardSize, false);
+  renderBoard(blob.boardSize, localState.tilesPlaced < localState.tilesPerTurn);
 }
 
 document.addEventListener('mousemove', e => drag&&moveDragGhost(e));
@@ -555,6 +643,33 @@ function setBanner(msg, cls) {
   const el = document.getElementById('banner');
   el.textContent = msg; el.className = 'banner ' + cls;
 }
+function renderMoveHistory() {
+  if (!blob?.moves?.length) return;
+  const histEl = document.getElementById('move-history');
+  const listEl = document.getElementById('move-list');
+  histEl.style.display = '';
+  const names = blob.players.map(p=>p?.name||'?');
+  const ACTION_COLOR = { COMMIT:'#ffd54f', REVEAL:'#e94560', PLACE:'#69f0ae', GAME_START:'#4fc3f7' };
+  listEl.innerHTML = blob.moves.map((m, i) => {
+    const col = ACTION_COLOR[m.action] || '#aaa';
+    const pname = names[m.team] || `P${m.team+1}`;
+    const pcolor = m.team===0 ? '#4fc3f7' : '#ff8a65';
+    const payStr = m.action === 'REVEAL'
+      ? `[board: ${(m.payload?.pieces?.length||0)} pieces, salt: ${m.payload?.salt?.slice(0,8)||'?'}...]`
+      : m.action === 'COMMIT'
+      ? `[hash: ${m.payload?.hash?.slice(0,20)||'?'}..., count: ${m.payload?.pieceCount}]`
+      : JSON.stringify(m.payload||{}).slice(0, 60);
+    const ts = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : '';
+    return `<div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px solid #1a2840;font-family:monospace;font-size:11px;">
+      <span style="color:#445;min-width:20px;">${i+1}.</span>
+      <span style="color:${pcolor};min-width:70px;">${pname}</span>
+      <span style="color:${col};min-width:70px;font-weight:700;">${m.action}</span>
+      <span style="color:#667;flex:1;">${payStr}</span>
+      <span style="color:#334;font-size:10px;">${ts}</span>
+    </div>`;
+  }).join('');
+}
+
 function setStatus(msg, isErr) {
   const el = document.getElementById('status-bar');
   el.textContent = msg;
