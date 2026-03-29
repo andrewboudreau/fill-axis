@@ -258,6 +258,14 @@ sequenceDiagram
       </div>
     </div>
 
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <label style="font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="cheat-p1-toggle"> <span style="color:var(--red)">☠ P1 sneaks a piece after committing</span>
+      </label>
+      <label style="font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="cheat-p2-toggle"> <span style="color:var(--red)">☠ P2 sneaks a piece after committing</span>
+      </label>
+    </div>
     <div id="sim-verdict"></div>
     <div id="sim-explain" class="verdict info" style="margin-top:10px;">
       ⓘ Step ①: Salts generated automatically on load. Each player's salt is secret — never shared until Phase 4.
@@ -329,6 +337,70 @@ sequenceDiagram
         <div class="val hash" id="live-output" style="min-height:80px;word-break:break-all;font-size:.7rem;">computing...</div>
         <p class="note" style="margin-top:6px;" id="live-bitdiff"></p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 4b: SIGNED CHAIN -->
+<section>
+  <div class="card">
+    <h2>Signed Game Chain (ECDSA) — Tamper-Evident Audit Log</h2>
+    <p class="note" style="margin-bottom:14px;">
+      Beyond the commitment, every game action is signed with the player's private key and chained via <code>prevHash</code>.
+      After the game, anyone with both public keys can prove no moves were inserted, deleted, or modified.
+      <strong>Private keys never leave the browser.</strong>
+    </p>
+    <button class="btn-a" id="btn-gen-chain" onclick="runChainDemo()">Generate Keypairs &amp; Build Chain</button>
+    <div id="chain-output" style="margin-top:14px;"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════ SECTION 4c: ASYNC FAIR EXCHANGE -->
+<section>
+  <div class="card">
+    <h2>Async Fair Exchange (for turn-based / offline play)</h2>
+    <p class="note" style="margin-bottom:12px;">
+      In a <em>real-time</em> game both players are online at reveal — disconnect = forfeit solves the problem.
+      For <em>async</em> play (email chess style) you need a different protocol. This is the "both deposit" idea you described.
+    </p>
+    <div class="mermaid-wrap" style="margin-bottom:14px;">
+      <div class="mermaid">
+sequenceDiagram
+    participant P1 as Player 1
+    participant S  as Blob Store (untrusted)
+    participant P2 as Player 2
+
+    Note over P1,P2: All pieces placed. Commitments already exchanged.
+
+    P1->>P1: encrypt(board₁+salt₁, P2_pubkey) → sealed₁
+    P2->>P2: encrypt(board₂+salt₂, P1_pubkey) → sealed₂
+
+    P1->>S: upload sealed₁
+    P2->>S: upload sealed₂
+
+    P1->>S: poll — is sealed₂ there?
+    P2->>S: poll — is sealed₁ there?
+
+    Note over P1,P2: Both see both blobs exist. Safe to exchange decrypt keys.
+
+    P1-->>P2: send P1 private key (or decrypt key)
+    P2-->>P1: send P2 private key (or decrypt key)
+
+    P1->>P1: decrypt sealed₂ with P2 key → verify commitment
+    P2->>P2: decrypt sealed₁ with P1 key → verify commitment
+      </div>
+    </div>
+    <div class="card" style="background:var(--cell)">
+      <h3>Why this works</h3>
+      <p class="note">
+        If P1 uploads <code>sealed₁</code> and P2 never uploads — P1 simply doesn't share their decrypt key. Neither player learns anything.
+        <br><br>
+        Once <em>both</em> sealed blobs exist, each player knows the other is committed. Sharing the decrypt key reveals nothing beyond what's already locked.
+        <br><br>
+        The blob store is <strong>untrusted</strong> — it sees only encrypted ciphertext. It cannot read either board.
+        <br><br>
+        <strong>Current status:</strong> Real-time P2P (the game as built) doesn't need this — PeerJS + forfeit-on-disconnect is sufficient. This protocol is documented for a future async mode.
+      </p>
     </div>
   </div>
 </section>
@@ -535,8 +607,18 @@ async function simStep(n) {
   }
   else if (n === 4) {
     // Verify
-    const bs1 = boardStateString(SIM.p1.pieces);
-    const bs2 = boardStateString(SIM.p2.pieces);
+    // Apply cheat if toggled: add a hidden extra piece after commitment was locked
+    const cheatP1 = document.getElementById('cheat-p1-toggle').checked;
+    const cheatP2 = document.getElementById('cheat-p2-toggle').checked;
+    const p1reveal = cheatP1
+      ? [...SIM.p1.pieces, {x:3,y:3,type:'X',team:0,dead:false}]
+      : SIM.p1.pieces;
+    const p2reveal = cheatP2
+      ? [...SIM.p2.pieces, {x:0,y:0,type:'X',team:1,dead:false}]
+      : SIM.p2.pieces;
+
+    const bs1 = boardStateString(p1reveal);
+    const bs2 = boardStateString(p2reveal);
     const h1check = await sha256(bs1 + SIM.p1.salt);
     const h2check = await sha256(bs2 + SIM.p2.salt);
     const v1ok = h1check === SIM.p1.commitment;
@@ -672,6 +754,101 @@ async function runAtk4() {
     el.textContent += `No collision found in 1000 attempts.\n\nSHA-256 has 2^256 ≈ 10^77 possible outputs.\nThe sun will burn out before a collision is found by random search.\nThis is why commitments are binding.`;
   }
   el.className = 'val ' + (found ? 'invalid' : 'valid');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIGNED CHAIN DEMO
+// ─────────────────────────────────────────────────────────────────────────────
+async function runChainDemo() {
+  const out = document.getElementById('chain-output');
+  const btn = document.getElementById('btn-gen-chain');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  out.innerHTML = '<div style="color:var(--muted);font-size:.82rem;">Generating ECDSA keypairs and building chain...</div>';
+
+  // Generate keypairs for both players
+  const kp1 = await generateKeyPair();
+  const kp2 = await generateKeyPair();
+  const pub1b64 = await exportPublicKey(kp1.publicKey);
+  const pub2b64 = await exportPublicKey(kp2.publicKey);
+
+  // Simulate a game: setup → placements → commits → reveals
+  const salt1 = generateSalt();
+  const salt2 = generateSalt();
+  const board1 = '0:KING:1,1|0:VERT:2,3';
+  const board2 = '1:KING:0,2|1:HORZ:3,0';
+  const c1 = await sha256(board1 + salt1);
+  const c2 = await sha256(board2 + salt2);
+
+  const actions = [
+    { player: 0, action: 'GAME_START', payload: { boardSize: 4 } },
+    { player: 0, action: 'PLACE',      payload: { pieceCount: 1 } },
+    { player: 1, action: 'PLACE',      payload: { pieceCount: 1 } },
+    { player: 0, action: 'PLACE',      payload: { pieceCount: 1 } },
+    { player: 1, action: 'PLACE',      payload: { pieceCount: 1 } },
+    { player: 0, action: 'COMMIT',     payload: { hash: c1 } },
+    { player: 1, action: 'COMMIT',     payload: { hash: c2 } },
+    { player: 0, action: 'REVEAL',     payload: { board: board1, salt: salt1 } },
+    { player: 1, action: 'REVEAL',     payload: { board: board2, salt: salt2 } },
+  ];
+
+  // Build chain
+  let prevHash = '0'.repeat(64);
+  const chain = [];
+  for (const a of actions) {
+    const pk = a.player === 0 ? kp1.privateKey : kp2.privateKey;
+    const block = await createBlock(a.action, a.payload, prevHash, pk);
+    prevHash = await hashBlock(block);
+    chain.push({ ...block, _hash: prevHash, _player: a.player });
+  }
+
+  // Verify all blocks
+  const pubK1 = await importPublicKey(pub1b64);
+  const pubK2 = await importPublicKey(pub2b64);
+  let allValid = true;
+  const rows = [];
+  for (const block of chain) {
+    const pubKey = block._player === 0 ? pubK1 : pubK2;
+    const { signature, _hash, _player, ...data } = block;
+    const valid = await verifyBlock(data, signature, pubKey);
+    if (!valid) allValid = false;
+    rows.push({ block, valid });
+  }
+
+  // Render
+  const pcolor = ['var(--p1)', 'var(--p2)'];
+  let html = `
+    <div class="verdict ${allValid ? 'ok' : 'bad'}" style="margin-bottom:12px;">
+      ${allValid ? `✅ All ${chain.length} blocks verified — chain is intact` : '❌ Chain verification failed'}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;font-size:.75rem;">
+      <div class="val" style="color:var(--p1)">P1 public key:<br>${pub1b64.slice(0,60)}...</div>
+      <div class="val" style="color:var(--p2)">P2 public key:<br>${pub2b64.slice(0,60)}...</div>
+    </div>
+    <div style="font-size:.75rem;color:var(--muted);margin-bottom:8px;">
+      Block chain — each row links to previous via prevHash. Any tampering breaks the chain from that point forward.
+    </div>`;
+
+  for (let i = 0; i < rows.length; i++) {
+    const { block, valid } = rows[i];
+    const pname = 'P' + (block._player + 1);
+    const col = pcolor[block._player];
+    const payloadStr = JSON.stringify(block.payload).slice(0, 80);
+    html += `
+    <div style="display:grid;grid-template-columns:24px 60px 90px 1fr 1fr;gap:8px;align-items:center;
+                padding:8px 10px;background:var(--cell);border-radius:4px;margin:3px 0;
+                border-left:3px solid ${valid ? 'var(--green)' : 'var(--red)'};font-size:.72rem;font-family:var(--mono);">
+      <span style="color:${valid?'var(--green)':'var(--red)'}">${valid?'✅':'❌'}</span>
+      <span style="color:${col};font-weight:700;">${pname}</span>
+      <span style="color:var(--accent)">${block.action}</span>
+      <span style="color:var(--muted)" title="${payloadStr}">${payloadStr.slice(0,50)}${payloadStr.length>50?'…':''}</span>
+      <span style="color:#555" title="hash: ${block._hash}">→ ${block._hash.slice(0,16)}...</span>
+    </div>`;
+  }
+
+  out.innerHTML = html;
+  btn.disabled = false;
+  btn.textContent = '↺ Re-generate';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
