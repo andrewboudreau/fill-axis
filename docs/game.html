@@ -277,9 +277,25 @@ function phasePlacement() {
     return;
   }
 
+  // Check if all my pieces are placed — if so, prompt to commit
+  const totalPieces = Object.values(counts).reduce((a,b)=>a+b,0);
+  const allMyPiecesPlaced = localState.pieces.length >= totalPieces;
+
+  if (isMyTurn && allMyPiecesPlaced) {
+    // All pieces placed but haven't committed yet — show commit prompt
+    setBanner('✅ All pieces placed — commit your board to lock it in', 'myturn');
+    document.getElementById('game-ui').style.display = '';
+    renderBoard(size, false);
+    renderTrays(size);
+    renderScores();
+    const actEl = document.getElementById('actions');
+    actEl.innerHTML = `<button class="btn-a" onclick="endPlacementTurn()">🔒 Commit Board</button>`;
+    return;
+  }
+
   setBanner(isMyTurn ? `🎯 Place your pieces — ${tilesPerTurn - localState.tilesPlaced} remaining this turn` : "⏳ Opponent's turn...", isMyTurn ? 'myturn' : 'theirturn');
   document.getElementById('game-ui').style.display = '';
-  renderBoard(size, true);
+  renderBoard(size, isMyTurn);
   renderTrays(size);
   renderScores();
   renderPlacementActions(isMyTurn, tilesPerTurn);
@@ -457,6 +473,8 @@ async function endPlacementTurn() {
     saveLocalGameState(GAME_CODE, localState);
     blob.currentTeam = 1 - myTeam;
     blob.turnNumber = (blob.turnNumber || 0) + 1;
+    // Track running piece count so opponent tray can show progress
+    blob.players[myTeam].piecesPlacedSoFar = localState.pieces.length;
     blob.updatedAt = new Date().toISOString();
     await blobWrite(asyncBlobName(GAME_CODE), blob);
     blob = await asyncLoadGame(GAME_CODE);
@@ -585,14 +603,19 @@ function renderTrays(size) {
   }
 
   // Opponent tray — show how many hidden pieces they've placed this game
-  const oppPieceCount = blob.players[1-myTeam]?.pieceCount ?? 0;
+  const oppPlayer = blob.players[1-myTeam];
+  // pieceCount is set only on commit; piecesPlacedSoFar updates each turn
+  const oppPieceCount = oppPlayer?.pieceCount ?? oppPlayer?.piecesPlacedSoFar ?? 0;
   const totalPieces = Object.values(getPieceCountsForSize(size)).reduce((a,b)=>a+b,0);
   const oppRemaining = totalPieces - oppPieceCount;
+  const oppCommitted = !!oppPlayer?.commitment;
 
   const oppInfo = document.createElement('div');
   oppInfo.style.cssText = 'font-size:.75rem;color:var(--muted);padding:6px 4px;';
-  oppInfo.innerHTML = `<div style="margin-bottom:6px;color:${oppColor}">${oppPieceCount} placed</div>
-    <div style="color:var(--muted)">${oppRemaining} remaining</div>`;
+  oppInfo.innerHTML = `
+    <div style="margin-bottom:4px;color:${oppColor};font-weight:700;">${oppPieceCount} placed</div>
+    <div style="color:var(--muted);font-size:.72rem;">${oppRemaining} remaining</div>
+    ${oppCommitted ? `<div style="color:var(--green);font-size:.72rem;margin-top:4px;">✅ Committed</div>` : ''}`;
   theirTray.appendChild(oppInfo);
 
   // Show hidden piece tokens for each committed opponent piece

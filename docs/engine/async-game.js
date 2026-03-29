@@ -127,6 +127,10 @@ async function asyncSubmitCommitment(code, team, commitment, pieceCount, private
   if (bothCommitted) {
     blob.phase = 'COMMITTED';
     blob.currentTeam = 0; // host reveals first
+  } else {
+    // Only one player committed — advance turn so opponent knows to place/commit
+    blob.currentTeam = 1 - team;
+    blob.turnNumber = (blob.turnNumber || 0) + 1;
   }
 
   // Sign the move
