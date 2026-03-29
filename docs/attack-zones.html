@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attack Zone Demo — Fill Axis</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --border: #0f3460;
+    --accent: #e94560; --cell: #0d1b2a; --cell-hover: #1a2f47;
+    --text: #e0e0e0; --muted: #888; --p1: #4fc3f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+  nav { display: flex; gap: 4px; background: var(--panel); border-bottom: 1px solid var(--border); padding: 10px 20px; }
+  nav a { color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; transition: color 0.15s, background 0.15s; }
+  nav a:hover, nav a.active { color: var(--accent); background: rgba(233,69,96,0.12); }
+  #app { display: flex; flex-direction: column; align-items: center; padding: 32px 20px; gap: 24px; }
+  h1 { font-size: 1.8rem; letter-spacing: 3px; color: var(--accent); text-transform: uppercase; }
+  p.sub { color: var(--muted); font-size: 0.85rem; letter-spacing: 1px; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  button { cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text);
+           border-radius: 8px; padding: 10px 20px; font-size: 1rem; font-weight: 700; transition: border-color 0.15s, color 0.15s; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.selected { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.12); }
+  #grid { display: grid; grid-template-columns: repeat(4, 80px); gap: 4px; }
+  .cell { width: 80px; height: 80px; background: var(--cell); border: 1px solid #1e3050; border-radius: 4px;
+          display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+          cursor: pointer; transition: background 0.1s; user-select: none; }
+  .cell:hover { background: var(--cell-hover); }
+  .cell.attacked { background: rgba(233,69,96,0.28); border-color: var(--accent); }
+  .cell.origin  { background: rgba(233,69,96,0.55); border-color: var(--accent); }
+  #hint { color: var(--muted); font-size: 0.85rem; min-height: 20px; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html">▶ Play</a>
+  <a href="attack-zones.html" class="active">⚔ Attack Zones</a>
+  <a href="scoring.html">📊 Scoring</a>
+  <a href="rules.html">📖 Rules</a>
+</nav>
+<div id="app">
+  <h1>Attack Zone Demo</h1>
+  <p class="sub">Select a piece type, then click a cell to see its attack range</p>
+
+  <div class="btn-row" id="piece-btns"></div>
+
+  <div id="grid"></div>
+  <div id="hint">← Choose a piece type above</div>
+</div>
+
+<script src="engine/pieces.js"></script>
+<script>
+  const SIZE = 4;
+  let selected = null; // currently selected piece type key
+
+  // Build piece buttons
+  const btnRow = document.getElementById('piece-btns');
+  for (const [key, info] of Object.entries(PIECE_TYPES)) {
+    const btn = document.createElement('button');
+    btn.dataset.key = key;
+    btn.innerHTML = `<span style="margin-right:6px">${info.icon}</span>${info.name}`;
+    btn.addEventListener('click', () => {
+      selected = key;
+      document.querySelectorAll('#piece-btns button').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      clearGrid();
+      document.getElementById('hint').textContent = `Now click a cell to place the ${info.name}`;
+    });
+    btnRow.appendChild(btn);
+  }
+
+  // Build grid (y from SIZE-1 down to 0, x left to right)
+  const grid = document.getElementById('grid');
+  for (let y = SIZE - 1; y >= 0; y--) {
+    for (let x = 0; x < SIZE; x++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.x = x;
+      cell.dataset.y = y;
+      cell.addEventListener('click', () => onCellClick(x, y, cell));
+      grid.appendChild(cell);
+    }
+  }
+
+  function clearGrid() {
+    document.querySelectorAll('.cell').forEach(c => {
+      c.classList.remove('attacked', 'origin');
+      c.textContent = '';
+    });
+  }
+
+  function onCellClick(x, y, clickedCell) {
+    if (!selected) {
+      document.getElementById('hint').textContent = '← Choose a piece type first';
+      return;
+    }
+    clearGrid();
+    const info = PIECE_TYPES[selected];
+    clickedCell.classList.add('origin');
+    clickedCell.textContent = info.icon;
+
+    const attacked = getAttackedCells(x, y, selected, SIZE);
+    for (const [ax, ay] of attacked) {
+      const cell = document.querySelector(`.cell[data-x="${ax}"][data-y="${ay}"]`);
+      if (cell && cell !== clickedCell) cell.classList.add('attacked');
+    }
+    document.getElementById('hint').textContent =
+      `${info.name} at (${x},${y}) attacks ${attacked.length} cell(s) — ${info.desc}`;
+  }
+</script>
+</body>
+</html>

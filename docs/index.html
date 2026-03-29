@@ -130,7 +130,21 @@
 </style>
 </head>
 <body>
+<style>
+  #site-nav { display: flex; gap: 4px; background: var(--panel); border-bottom: 1px solid var(--border);
+              padding: 10px 20px; width: 100%; align-self: stretch; }
+  #site-nav a { color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 6px;
+                font-size: 0.9rem; font-weight: 600; transition: color 0.15s, background 0.15s; }
+  #site-nav a:hover, #site-nav a.active { color: var(--accent); background: rgba(233,69,96,0.12); }
+</style>
+
 <div id="app">
+  <nav id="site-nav">
+    <a href="index.html" class="active">▶ Play</a>
+    <a href="attack-zones.html">⚔ Attack Zones</a>
+    <a href="scoring.html">📊 Scoring</a>
+    <a href="rules.html">📖 Rules</a>
+  </nav>
   <h1>Fill Axis</h1>
   <div id="subtitle">Two-Player Territory Game</div>
 

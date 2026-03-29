@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scoring Demo — Fill Axis</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --panel: #16213e; --border: #0f3460;
+    --accent: #e94560; --cell: #0d1b2a; --cell-hover: #1a2f47;
+    --text: #e0e0e0; --muted: #888;
+    --p1: #4fc3f7; --p1-dim: rgba(79,195,247,0.18);
+    --p2: #ff8a65; --p2-dim: rgba(255,138,101,0.18);
+    --contested: rgba(255,235,59,0.22); --elim: #ff1744;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+  nav { display: flex; gap: 4px; background: var(--panel); border-bottom: 1px solid var(--border); padding: 10px 20px; }
+  nav a { color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; transition: color 0.15s, background 0.15s; }
+  nav a:hover, nav a.active { color: var(--accent); background: rgba(233,69,96,0.12); }
+  #app { display: flex; flex-direction: column; align-items: center; padding: 32px 20px; gap: 24px; }
+  h1 { font-size: 1.8rem; letter-spacing: 3px; color: var(--accent); text-transform: uppercase; }
+  p.sub { color: var(--muted); font-size: 0.85rem; letter-spacing: 1px; text-align: center; max-width: 500px; }
+  #grid { display: grid; grid-template-columns: repeat(4, 72px); gap: 3px; }
+  .cell { width: 72px; height: 72px; background: var(--cell); border: 1px solid #1e3050; border-radius: 4px;
+          display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+          transition: background 0.25s; position: relative; }
+  .cell.attack-p1      { background: var(--p1-dim); }
+  .cell.attack-p2      { background: var(--p2-dim); }
+  .cell.attack-contested { background: var(--contested); }
+  .tile-token { width: 52px; height: 52px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+                font-size: 1.3rem; border: 2px solid transparent; transition: opacity 0.4s; }
+  .tile-p1 { background: rgba(79,195,247,0.25); border-color: var(--p1); color: var(--p1); }
+  .tile-p2 { background: rgba(255,138,101,0.25); border-color: var(--p2); color: var(--p2); }
+  .tile-dead { opacity: 0.2; border-color: var(--elim) !important; }
+  @keyframes elimFlash { 0%{background:rgba(255,23,68,0.55);transform:scale(1.12)} 100%{background:var(--cell);transform:scale(1)} }
+  .eliminating { animation: elimFlash 0.5s ease-out; }
+  .scores { display: flex; gap: 32px; }
+  .score-box { text-align: center; padding: 12px 28px; border-radius: 8px; }
+  .score-box.p1 { background: var(--p1-dim); border: 1px solid var(--p1); }
+  .score-box.p2 { background: var(--p2-dim); border: 1px solid var(--p2); }
+  .score-val  { font-size: 2rem; font-weight: 800; }
+  .score-name { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  button.btn-primary { cursor: pointer; border: none; background: var(--accent); color: #fff;
+    border-radius: 8px; padding: 12px 28px; font-size: 1rem; font-weight: 700; transition: opacity 0.15s; }
+  button.btn-primary:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  #winner-msg { font-size: 1.3rem; font-weight: 800; min-height: 2rem; letter-spacing: 2px; }
+  #log { color: var(--muted); font-size: 0.82rem; max-width: 400px; text-align: center; min-height: 40px; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; font-size: 0.78rem; color: var(--muted); }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  .leg-box { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+  button.btn-secondary { cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    border-radius: 8px; padding: 10px 22px; font-size: 0.9rem; font-weight: 600; transition: border-color 0.15s; margin-top: 4px; }
+  button.btn-secondary:hover { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html">▶ Play</a>
+  <a href="attack-zones.html">⚔ Attack Zones</a>
+  <a href="scoring.html" class="active">📊 Scoring</a>
+  <a href="rules.html">📖 Rules</a>
+</nav>
+<div id="app">
+  <h1>Scoring Demo</h1>
+  <p class="sub">A pre-set 4×4 board. Hit <strong>Resolve Battle</strong> to run elimination rounds and see territory scoring live.</p>
+
+  <div class="scores">
+    <div class="score-box p1"><div class="score-val" id="score-0">0</div><div class="score-name">Blue</div></div>
+    <div class="score-box p2"><div class="score-val" id="score-1">0</div><div class="score-name">Orange</div></div>
+  </div>
+
+  <div id="grid"></div>
+
+  <div class="legend">
+    <span><span class="leg-box" style="background:var(--p1-dim);border:1px solid var(--p1)"></span>Blue Zone</span>
+    <span><span class="leg-box" style="background:var(--p2-dim);border:1px solid var(--p2)"></span>Orange Zone</span>
+    <span><span class="leg-box" style="background:var(--contested)"></span>Contested</span>
+  </div>
+
+  <button class="btn-primary" id="btn-resolve">Resolve Battle ⚔</button>
+  <div id="winner-msg"></div>
+  <div id="log"></div>
+  <button class="btn-secondary" id="btn-reset">↺ Reset</button>
+</div>
+
+<script src="engine/pieces.js"></script>
+<script src="engine/board.js"></script>
+<script>
+  const SIZE = 4;
+
+  // Pre-set pieces: 3 per side on a 4×4 board
+  // team 0 = Blue, team 1 = Orange
+  const INITIAL_PIECES = [
+    { x: 0, y: 3, type: 'KING', team: 0 },
+    { x: 1, y: 1, type: 'HORZ', team: 0 },
+    { x: 3, y: 2, type: 'VERT', team: 0 },
+    { x: 3, y: 0, type: 'KING', team: 1 },
+    { x: 2, y: 3, type: 'X',    team: 1 },
+    { x: 0, y: 0, type: 'VERT', team: 1 },
+  ];
+
+  let pieces = [];
+
+  function resetPieces() {
+    pieces = INITIAL_PIECES.map(p => ({ ...p, dead: false, hidden: false }));
+  }
+
+  function renderBoard() {
+    const map = buildAttackMap(pieces, SIZE);
+    const t   = getTerritoryCount(map, SIZE);
+    document.getElementById('score-0').textContent = t[0];
+    document.getElementById('score-1').textContent = t[1];
+
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    for (let y = SIZE - 1; y >= 0; y--) {
+      for (let x = 0; x < SIZE; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.x = x; cell.dataset.y = y;
+
+        const atk = map[x][y];
+        if (atk[0] > 0 && atk[1] > 0)      cell.classList.add('attack-contested');
+        else if (atk[0] > atk[1])           cell.classList.add('attack-p1');
+        else if (atk[1] > atk[0])           cell.classList.add('attack-p2');
+
+        const piece = pieces.find(p => p.x === x && p.y === y);
+        if (piece) {
+          const token = document.createElement('div');
+          token.className = 'tile-token ' + (piece.team === 0 ? 'tile-p1' : 'tile-p2');
+          if (piece.dead) token.classList.add('tile-dead');
+          token.textContent = PIECE_TYPES[piece.type].icon;
+          cell.appendChild(token);
+        }
+        grid.appendChild(cell);
+      }
+    }
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function resolve() {
+    const btn = document.getElementById('btn-resolve');
+    btn.disabled = true;
+    document.getElementById('winner-msg').textContent = '';
+    document.getElementById('log').textContent = 'Resolving...';
+
+    let round = 0;
+    while (true) {
+      const elim = resolveBattleRound(pieces, SIZE);
+      if (elim.length === 0) break;
+
+      // Flash eliminated cells
+      renderBoard();
+      for (const p of elim) {
+        const cell = document.querySelector(`.cell[data-x="${p.x}"][data-y="${p.y}"]`);
+        if (cell) cell.classList.add('eliminating');
+      }
+      const names = elim.map(p => `${PIECE_TYPES[p.type].name}(${p.team === 0 ? 'Blue' : 'Orange'})`).join(', ');
+      document.getElementById('log').textContent = `Round ${round + 1}: eliminated ${names}`;
+      await sleep(700);
+      renderBoard();
+      await sleep(300);
+      round++;
+      if (round > 20) break;
+    }
+
+    // Final result
+    const map = buildAttackMap(pieces, SIZE);
+    const territory = getTerritoryCount(map, SIZE);
+    document.getElementById('log').textContent = `Battle complete after ${round} round(s).`;
+
+    // Evaluate
+    const kingsPerPlayer = getPieceCountsForSize(SIZE).KING;
+    const kingThreshold  = kingsPerPlayer === 1 ? 1 : 2;
+    const kings = [0, 1].map(t => pieces.filter(p => p.type === 'KING' && p.team === t && !p.dead).length);
+
+    let winner = null;
+    let reason = 'by Territory';
+    if (kings[0] - kings[1] >= kingThreshold || (kings[1] === 0 && kings[0] > 0)) {
+      winner = 0; reason = 'by General';
+    } else if (kings[1] - kings[0] >= kingThreshold || (kings[0] === 0 && kings[1] > 0)) {
+      winner = 1; reason = 'by General';
+    } else {
+      if      (territory[0] > territory[1]) winner = 0;
+      else if (territory[1] > territory[0]) winner = 1;
+    }
+
+    const wmsg = document.getElementById('winner-msg');
+    if (winner === null) {
+      wmsg.textContent = 'Draw!';
+      wmsg.style.color = '#ffd54f';
+    } else {
+      wmsg.textContent = `${winner === 0 ? 'Blue' : 'Orange'} Wins! ${reason}`;
+      wmsg.style.color = winner === 0 ? 'var(--p1)' : 'var(--p2)';
+    }
+
+    renderBoard();
+  }
+
+  document.getElementById('btn-resolve').addEventListener('click', resolve);
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    resetPieces();
+    renderBoard();
+    document.getElementById('winner-msg').textContent = '';
+    document.getElementById('log').textContent = '';
+    document.getElementById('btn-resolve').disabled = false;
+  });
+
+  resetPieces();
+  renderBoard();
+</script>
+</body>
+</html>
