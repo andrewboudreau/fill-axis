@@ -473,8 +473,9 @@ async function endPlacementTurn() {
     saveLocalGameState(GAME_CODE, localState);
     blob.currentTeam = 1 - myTeam;
     blob.turnNumber = (blob.turnNumber || 0) + 1;
-    // Track running piece count so opponent tray can show progress
+    // Track piece count AND positions (without type) for opponent's fog-of-war rendering
     blob.players[myTeam].piecesPlacedSoFar = localState.pieces.length;
+    blob.players[myTeam].hiddenPieces = localState.pieces.map(p => ({ x: p.x, y: p.y }));
     blob.updatedAt = new Date().toISOString();
     await blobWrite(asyncBlobName(GAME_CODE), blob);
     blob = await asyncLoadGame(GAME_CODE);
@@ -497,12 +498,20 @@ async function doReveal() {
 // Build the set of cells occupied by EITHER player (my pieces + opponent's known pieces from blob)
 function getOccupiedCells() {
   const occ = new Set();
-  // My placed pieces
   for (const p of (localState?.pieces || [])) occ.add(`${p.x},${p.y}`);
-  // Opponent's revealed pieces (if available in blob — placement phase only has count, not positions)
+  // Hidden pieces (position known, type hidden) — block placement on these cells
+  const oppHidden = blob?.players?.[1 - myTeam]?.hiddenPieces || [];
+  for (const p of oppHidden) occ.add(`${p.x},${p.y}`);
+  // Revealed pieces (post-reveal phase)
   const oppRevealed = blob?.players?.[1 - myTeam]?.revealedPieces || [];
   for (const p of oppRevealed) occ.add(`${p.x},${p.y}`);
   return occ;
+}
+
+function getOpponentHiddenCells() {
+  return new Set(
+    (blob?.players?.[1 - myTeam]?.hiddenPieces || []).map(p => `${p.x},${p.y}`)
+  );
 }
 
 function renderBoard(size, interactive) {
@@ -513,17 +522,28 @@ function renderBoard(size, interactive) {
   const canDrop = interactive && drag && blob.currentTeam === myTeam &&
     localState.tilesPlaced < localState.tilesPerTurn;
 
+  const oppHidden = getOpponentHiddenCells();
+
   for (let y = size-1; y>=0; y--) {
     for (let x=0; x<size; x++) {
       const cell = document.createElement('div');
       cell.className = 'cell';
       cell.dataset.x = x; cell.dataset.y = y;
       const myPiece = localState?.pieces.find(p=>p.x===x&&p.y===y);
+      const isOppHidden = oppHidden.has(`${x},${y}`);
+
       if (myPiece) {
         const t = document.createElement('div');
         t.className = 'tile tile-p' + (myTeam+1);
         t.textContent = PIECE_TYPES_DATA[myPiece.type]?.icon || '?';
         t.style.color = myTeam===0 ? 'var(--p1)' : 'var(--p2)';
+        cell.appendChild(t);
+      } else if (isOppHidden) {
+        // Opponent placed here — show as hidden token
+        const t = document.createElement('div');
+        t.className = 'tile tile-hidden';
+        t.textContent = '?';
+        t.title = 'Opponent piece (hidden)';
         cell.appendChild(t);
       } else if (canDrop && !occupied.has(`${x},${y}`)) {
         cell.classList.add('drop-ok');

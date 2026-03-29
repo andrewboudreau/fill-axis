@@ -3,280 +3,489 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scoring Demo — Fill Axis</title>
-<style>
-  :root {
-    --bg: #1a1a2e; --panel: #16213e; --border: #0f3460;
-    --accent: #e94560; --cell: #0d1b2a; --cell-hover: #1a2f47;
-    --text: #e0e0e0; --muted: #888;
-    --p1: #4fc3f7; --p1-dim: rgba(79,195,247,0.18);
-    --p2: #ff8a65; --p2-dim: rgba(255,138,101,0.18);
-    --contested: rgba(255,235,59,0.22); --elim: #ff1744;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
-  nav { display: flex; gap: 4px; background: var(--panel); border-bottom: 1px solid var(--border); padding: 10px 20px; }
-  nav a { color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; transition: color 0.15s, background 0.15s; }
-  nav a:hover, nav a.active { color: var(--accent); background: rgba(233,69,96,0.12); }
-  #app { display: flex; flex-direction: column; align-items: center; padding: 32px 20px; gap: 24px; }
-  h1 { font-size: 1.8rem; letter-spacing: 3px; color: var(--accent); text-transform: uppercase; }
-  p.sub { color: var(--muted); font-size: 0.85rem; letter-spacing: 1px; text-align: center; max-width: 500px; }
-  #grid { display: grid; grid-template-columns: repeat(4, 72px); gap: 3px; }
-  .cell { width: 72px; height: 72px; background: var(--cell); border: 1px solid #1e3050; border-radius: 4px;
-          display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
-          transition: background 0.25s; position: relative; }
-  .cell.attack-p1      { background: var(--p1-dim); }
-  .cell.attack-p2      { background: var(--p2-dim); }
-  .cell.attack-contested { background: var(--contested); }
-  .tile-token { width: 52px; height: 52px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
-                font-size: 1.3rem; border: 2px solid transparent; transition: opacity 0.4s; }
-  .tile-p1 { background: rgba(79,195,247,0.25); border-color: var(--p1); color: var(--p1); }
-  .tile-p2 { background: rgba(255,138,101,0.25); border-color: var(--p2); color: var(--p2); }
-  .tile-dead { opacity: 0.2; border-color: var(--elim) !important; }
-  @keyframes elimFlash { 0%{background:rgba(255,23,68,0.55);transform:scale(1.12)} 100%{background:var(--cell);transform:scale(1)} }
-  .eliminating { animation: elimFlash 0.5s ease-out; }
-  .scores { display: flex; gap: 32px; }
-  .score-box { text-align: center; padding: 12px 28px; border-radius: 8px; }
-  .score-box.p1 { background: var(--p1-dim); border: 1px solid var(--p1); }
-  .score-box.p2 { background: var(--p2-dim); border: 1px solid var(--p2); }
-  .score-val  { font-size: 2rem; font-weight: 800; }
-  .score-name { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-  button.btn-primary { cursor: pointer; border: none; background: var(--accent); color: #fff;
-    border-radius: 8px; padding: 12px 28px; font-size: 1rem; font-weight: 700; transition: opacity 0.15s; }
-  button.btn-primary:hover { opacity: 0.85; }
-  button:disabled { opacity: 0.4; cursor: default; }
-  #winner-msg { font-size: 1.3rem; font-weight: 800; min-height: 2rem; letter-spacing: 2px; }
-  #log { color: var(--muted); font-size: 0.82rem; max-width: 400px; text-align: center; min-height: 40px; }
-  .legend { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; font-size: 0.78rem; color: var(--muted); }
-  .legend span { display: flex; align-items: center; gap: 4px; }
-  .leg-box { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
-  button.btn-secondary { cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text);
-    border-radius: 8px; padding: 10px 22px; font-size: 0.9rem; font-weight: 600; transition: border-color 0.15s; margin-top: 4px; }
-  button.btn-secondary:hover { border-color: var(--accent); }
-  .size-btns { display: flex; gap: 8px; }
-  .size-btn { cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text);
-              border-radius: 8px; padding: 8px 18px; font-size: 0.9rem; font-weight: 700; transition: border-color 0.15s, color 0.15s; }
-  .size-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .size-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.12); }
-</style>
+<title>Fill Axis — Scoring Sandbox</title>
 <script src="engine/version.js"></script>
 <script src="engine/nav.js"></script>
+<script src="engine/pieces.js"></script>
+<script src="engine/board.js"></script>
+<style>
+:root{--bg:#1a1a2e;--panel:#16213e;--border:#0f3460;--accent:#e94560;
+  --p1:#4fc3f7;--p1bg:rgba(79,195,247,0.12);--p2:#ff8a65;--p2bg:rgba(255,138,101,0.12);
+  --green:#69f0ae;--yellow:#ffd54f;--red:#ff5252;--contested:rgba(255,235,59,0.15);
+  --cell:#0d1b2a;--text:#e0e0e0;--muted:#778;--mono:'Fira Mono','Consolas',monospace;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;}
+.page{max-width:1100px;margin:0 auto;padding:20px 16px;}
+h1{color:var(--accent);font-size:1.4rem;letter-spacing:2px;margin-bottom:4px;}
+.subtitle{color:var(--muted);font-size:.85rem;margin-bottom:18px;}
+.layout{display:grid;grid-template-columns:160px 1fr 300px;gap:16px;align-items:start;}
+@media(max-width:800px){.layout{grid-template-columns:1fr;}}
+
+/* Board */
+#board-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
+#board{display:grid;border:2px solid var(--border);border-radius:4px;user-select:none;}
+.cell{width:72px;height:72px;background:var(--cell);border:1px solid #1e3050;
+  display:flex;align-items:center;justify-content:center;font-size:1.4rem;
+  position:relative;cursor:default;transition:background .1s;}
+.cell.atk-p1{background:var(--p1bg);}
+.cell.atk-p2{background:var(--p2bg);}
+.cell.atk-both{background:var(--contested);}
+.cell.drop-ok{background:#1a2f47;cursor:copy;}
+.cell.drop-ok:hover{background:#253d5c;}
+.cell.drop-bad{cursor:not-allowed;}
+.cell.highlight{outline:2px solid var(--yellow);outline-offset:-2px;z-index:1;}
+.atk-label{position:absolute;bottom:2px;right:4px;font-size:9px;font-family:var(--mono);color:#556;}
+.tile{width:52px;height:52px;border-radius:8px;border:2px solid transparent;
+  display:flex;align-items:center;justify-content:center;font-size:1.4rem;pointer-events:none;}
+.tile-p1{background:rgba(79,195,247,.2);border-color:var(--p1);}
+.tile-p2{background:rgba(255,138,101,.2);border-color:var(--p2);}
+.tile-dead{opacity:.22;border-style:dashed;}
+
+/* Toolbar */
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;}
+.size-btn,.team-btn,.piece-btn,.action-btn{border:1px solid var(--border);background:var(--cell);
+  color:var(--muted);border-radius:5px;padding:5px 12px;cursor:pointer;font-size:.82rem;font-weight:600;}
+.size-btn:hover,.team-btn:hover,.piece-btn:hover,.action-btn:hover{border-color:var(--accent);color:var(--text);}
+.size-btn.on,.team-btn.on,.piece-btn.on{border-color:var(--accent);color:var(--accent);background:rgba(233,69,96,.1);}
+.btn-resolve{background:var(--accent);color:#fff;border:none;border-radius:6px;
+  padding:8px 20px;font-size:.9rem;font-weight:700;cursor:pointer;}
+.btn-resolve:hover{opacity:.85;}
+.btn-step{background:var(--border);color:var(--text);border:none;border-radius:6px;
+  padding:8px 16px;font-size:.9rem;font-weight:700;cursor:pointer;}
+.btn-step:hover{opacity:.85;}
+.btn-reset{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:5px;
+  padding:5px 12px;font-size:.82rem;cursor:pointer;}
+.btn-reset:hover{color:var(--text);}
+
+/* Tray */
+.tray{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px;}
+.tray-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.piece-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;
+  margin-bottom:6px;cursor:grab;background:var(--cell);border:1px solid var(--border);transition:border-color .12s;}
+.piece-row:hover{border-color:var(--accent);}
+.piece-row.selected{border-color:var(--accent);background:rgba(233,69,96,.08);}
+.piece-row.empty{opacity:.3;cursor:default;pointer-events:none;}
+.pr-icon{font-size:1.2rem;width:26px;text-align:center;}
+.pr-name{font-size:.78rem;font-weight:700;}
+.pr-desc{font-size:.68rem;color:var(--muted);}
+
+/* Score panel */
+.score-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.score-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.score-val{font-size:1.6rem;font-weight:900;}
+.score-name{font-size:.72rem;color:var(--muted);}
+.score-box{text-align:center;padding:8px 16px;border-radius:6px;flex:1;}
+.score-box.p1{background:var(--p1bg);border:1px solid var(--p1);}
+.score-box.p2{background:var(--p2bg);border:1px solid var(--p2);}
+
+/* Step log */
+#step-log{font-family:var(--mono);font-size:.75rem;max-height:300px;overflow-y:auto;
+  background:var(--cell);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:10px;}
+.log-round{color:var(--yellow);font-weight:700;margin-top:6px;}
+.log-elim{color:var(--red);}
+.log-info{color:var(--muted);}
+.log-ok{color:var(--green);}
+.log-cell{display:inline-block;padding:0 4px;background:#1a2840;border-radius:3px;}
+
+/* Winner */
+#verdict{padding:12px 16px;border-radius:8px;font-size:.95rem;font-weight:700;margin-top:10px;text-align:center;}
+#verdict.ok{background:rgba(105,240,174,.1);color:var(--green);border:1px solid var(--green);}
+#verdict.draw{background:rgba(255,213,79,.1);color:var(--yellow);border:1px solid var(--yellow);}
+
+/* Legend */
+.legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:.75rem;color:var(--muted);}
+.leg{display:flex;align-items:center;gap:4px;}
+.leg-box{width:12px;height:12px;border-radius:2px;}
+
+#drag-ghost{position:fixed;pointer-events:none;z-index:9999;display:none;
+  font-size:2rem;transform:translate(-50%,-50%);}
+</style>
 </head>
 <body>
 <nav id="site-nav"></nav>
-<div id="app">
-  <h1>Scoring Demo</h1>
-  <p class="sub">A pre-set board. Hit <strong>Resolve Battle</strong> to run elimination rounds and see territory scoring live.</p>
+<div class="page">
+  <h1>📊 Scoring Sandbox</h1>
+  <p class="subtitle">Drag pieces onto the board, then resolve or step through the battle algorithm. Click any placed piece to remove it.</p>
 
-  <div class="size-btns" id="size-btns">
-    <button class="size-btn selected" data-size="4">4×4</button>
-    <button class="size-btn" data-size="6">6×6</button>
-    <button class="size-btn" data-size="8">8×8</button>
+  <div class="toolbar" style="margin-bottom:14px;">
+    <div style="display:flex;gap:4px;">
+      <button class="size-btn on" data-size="4" onclick="setSize(4,this)">4×4</button>
+      <button class="size-btn" data-size="6" onclick="setSize(6,this)">6×6</button>
+      <button class="size-btn" data-size="8" onclick="setSize(8,this)">8×8</button>
+    </div>
+    <div style="display:flex;gap:4px;">
+      <button class="team-btn on" data-team="0" onclick="setTeam(0,this)" style="color:var(--p1);border-color:var(--p1)">◆ P1</button>
+      <button class="team-btn" data-team="1" onclick="setTeam(1,this)" style="color:var(--p2)">◆ P2</button>
+    </div>
+    <button class="btn-reset" onclick="resetBoard()">↺ Clear All</button>
+    <button class="btn-reset" onclick="loadPreset()">🎲 Random Preset</button>
   </div>
 
-  <div class="scores">
-    <div class="score-box p1"><div class="score-val" id="score-0">0</div><div class="score-name">Blue</div></div>
-    <div class="score-box p2"><div class="score-val" id="score-1">0</div><div class="score-name">Orange</div></div>
+  <div class="layout">
+    <!-- Piece tray -->
+    <div>
+      <div class="tray" id="tray-ui">
+        <div class="tray-label">Drag to place</div>
+      </div>
+      <div style="margin-top:10px;font-size:.75rem;color:var(--muted);line-height:1.6;">
+        • Drag piece → board<br>
+        • Click placed piece → remove<br>
+        • Switch P1/P2 to place each team
+      </div>
+    </div>
+
+    <!-- Board -->
+    <div id="board-wrap">
+      <div id="board"></div>
+      <div class="legend">
+        <div class="leg"><div class="leg-box" style="background:var(--p1bg);border:1px solid var(--p1)"></div> P1 zone</div>
+        <div class="leg"><div class="leg-box" style="background:var(--p2bg);border:1px solid var(--p2)"></div> P2 zone</div>
+        <div class="leg"><div class="leg-box" style="background:var(--contested)"></div> Contested</div>
+      </div>
+      <div class="toolbar">
+        <button class="btn-resolve" onclick="resolveAll()">⚡ Resolve All</button>
+        <button class="btn-step" onclick="resolveStep()">→ Step</button>
+        <button class="btn-reset" onclick="resetResolution()">↺ Reset Resolution</button>
+      </div>
+    </div>
+
+    <!-- Score + log -->
+    <div>
+      <div class="score-panel">
+        <div class="score-row">
+          <div class="score-box p1"><div class="score-val" id="score-p1">0</div><div class="score-name">Player 1</div></div>
+          <div style="font-size:1.2rem;color:var(--muted);padding:0 8px;">vs</div>
+          <div class="score-box p2"><div class="score-val" id="score-p2">0</div><div class="score-name">Player 2</div></div>
+        </div>
+        <div style="font-size:.75rem;color:var(--muted);text-align:center;" id="score-sub">Place pieces and resolve to see scores</div>
+      </div>
+      <div id="verdict" style="display:none"></div>
+      <div id="step-log"><div class="log-info">Resolution log will appear here.</div></div>
+    </div>
   </div>
-
-  <div id="grid"></div>
-
-  <div class="legend">
-    <span><span class="leg-box" style="background:var(--p1-dim);border:1px solid var(--p1)"></span>Blue Zone</span>
-    <span><span class="leg-box" style="background:var(--p2-dim);border:1px solid var(--p2)"></span>Orange Zone</span>
-    <span><span class="leg-box" style="background:var(--contested)"></span>Contested</span>
-  </div>
-
-  <button class="btn-primary" id="btn-resolve">Resolve Battle ⚔</button>
-  <div id="winner-msg"></div>
-  <div id="log"></div>
-  <button class="btn-secondary" id="btn-reset">↺ Reset</button>
 </div>
 
-<script src="engine/pieces.js"></script>
-<script src="engine/board.js"></script>
+<div id="drag-ghost"></div>
+
 <script>
-  let SIZE = 4;
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let SIZE = 4;
+let activeTeam = 0;
+let selectedType = 'KING';
+let pieces = [];       // { x, y, type, team, dead }
+let origPieces = [];   // snapshot before resolution
+let drag = null;
+let resolved = false;
+let stepState = null;  // { pieces, round } for stepping
 
-  // Pre-set pieces per board size
-  const PRESETS = {
-    4: [
-      { x: 0, y: 3, type: 'KING', team: 0 },
-      { x: 1, y: 1, type: 'HORZ', team: 0 },
-      { x: 3, y: 2, type: 'VERT', team: 0 },
-      { x: 3, y: 0, type: 'KING', team: 1 },
-      { x: 2, y: 3, type: 'X',    team: 1 },
-      { x: 0, y: 0, type: 'VERT', team: 1 },
-    ],
-    6: [
-      { x: 0, y: 5, type: 'KING', team: 0 },
-      { x: 2, y: 4, type: 'HORZ', team: 0 },
-      { x: 1, y: 2, type: 'VERT', team: 0 },
-      { x: 3, y: 3, type: 'X',    team: 0 },
-      { x: 4, y: 5, type: 'KING', team: 0 },
-      { x: 5, y: 1, type: 'HORZ', team: 0 },
-      { x: 5, y: 5, type: 'KING', team: 1 },
-      { x: 3, y: 1, type: 'HORZ', team: 1 },
-      { x: 4, y: 3, type: 'VERT', team: 1 },
-      { x: 2, y: 2, type: 'X',    team: 1 },
-      { x: 1, y: 4, type: 'KING', team: 1 },
-      { x: 0, y: 0, type: 'VERT', team: 1 },
-    ],
-    8: [
-      { x: 0, y: 7, type: 'KING', team: 0 },
-      { x: 2, y: 6, type: 'HORZ', team: 0 },
-      { x: 1, y: 4, type: 'VERT', team: 0 },
-      { x: 3, y: 5, type: 'X',    team: 0 },
-      { x: 4, y: 7, type: 'KING', team: 0 },
-      { x: 6, y: 6, type: 'HORZ', team: 0 },
-      { x: 5, y: 4, type: 'VERT', team: 0 },
-      { x: 7, y: 5, type: 'X',    team: 0 },
-      { x: 0, y: 0, type: 'KING', team: 1 },
-      { x: 2, y: 1, type: 'HORZ', team: 1 },
-      { x: 1, y: 3, type: 'VERT', team: 1 },
-      { x: 3, y: 2, type: 'X',    team: 1 },
-      { x: 4, y: 0, type: 'KING', team: 1 },
-      { x: 6, y: 1, type: 'HORZ', team: 1 },
-      { x: 5, y: 3, type: 'VERT', team: 1 },
-      { x: 7, y: 2, type: 'X',    team: 1 },
-    ],
-  };
+const PIECE_TYPES = {
+  KING:  { icon:'♛', name:'General',    desc:'Cross ±2/4' },
+  VERT:  { icon:'|',  name:'Vertical',   desc:'Full column' },
+  HORZ:  { icon:'—',  name:'Horizontal', desc:'Full row' },
+  X:     { icon:'✕',  name:'Diagonal',   desc:'Diagonals' },
+};
 
-  let pieces = [];
+// ─── BOARD SIZE ───────────────────────────────────────────────────────────────
+function setSize(s, btn) {
+  SIZE = s;
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.toggle('on', b.dataset.size == s));
+  resetBoard();
+}
 
-  // Size selector
-  document.querySelectorAll('.size-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      SIZE = parseInt(btn.dataset.size);
-      document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      resetPieces();
-      renderBoard();
-      document.getElementById('winner-msg').textContent = '';
-      document.getElementById('log').textContent = '';
-      document.getElementById('btn-resolve').disabled = false;
+function setTeam(t, btn) {
+  activeTeam = t;
+  document.querySelectorAll('.team-btn').forEach(b => b.classList.toggle('on', b.dataset.team == t));
+  buildTray();
+}
+
+// ─── TRAY ─────────────────────────────────────────────────────────────────────
+function buildTray() {
+  const tray = document.getElementById('tray-ui');
+  tray.innerHTML = '<div class="tray-label">Drag to place</div>';
+  const color = activeTeam === 0 ? 'var(--p1)' : 'var(--p2)';
+  for (const [type, info] of Object.entries(PIECE_TYPES)) {
+    const div = document.createElement('div');
+    div.className = 'piece-row' + (selectedType===type?' selected':'');
+    div.innerHTML = `<span class="pr-icon" style="color:${color}">${info.icon}</span>
+      <span><div class="pr-name">${info.name}</div><div class="pr-desc">${info.desc}</div></span>`;
+    div.addEventListener('click', () => {
+      selectedType = type;
+      document.querySelectorAll('.piece-row').forEach(r=>r.classList.remove('selected'));
+      div.classList.add('selected');
     });
-  });
-
-  function resetPieces() {
-    pieces = (PRESETS[SIZE] || PRESETS[4]).map(p => ({ ...p, dead: false, hidden: false }));
+    div.addEventListener('mousedown', e => { e.preventDefault(); startDrag(type, e); });
+    div.addEventListener('touchstart', e => { e.preventDefault(); startDrag(type, e); }, {passive:false});
+    tray.appendChild(div);
   }
+}
 
-  function renderBoard() {
-    const map = buildAttackMap(pieces, SIZE);
-    const t   = getTerritoryCount(map, SIZE);
-    document.getElementById('score-0').textContent = t[0];
-    document.getElementById('score-1').textContent = t[1];
+// ─── DRAG ─────────────────────────────────────────────────────────────────────
+const ghost = document.getElementById('drag-ghost');
 
-    const cellSize = SIZE <= 4 ? 72 : SIZE <= 6 ? 60 : 48;
-    const tokenSize = SIZE <= 4 ? 52 : SIZE <= 6 ? 42 : 34;
-    const fontSize  = SIZE <= 4 ? '1.5rem' : SIZE <= 6 ? '1.2rem' : '1rem';
-
-    const grid = document.getElementById('grid');
-    grid.style.gridTemplateColumns = `repeat(${SIZE}, ${cellSize}px)`;
-    grid.innerHTML = '';
-    for (let y = SIZE - 1; y >= 0; y--) {
-      for (let x = 0; x < SIZE; x++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.style.width = cellSize + 'px';
-        cell.style.height = cellSize + 'px';
-        cell.style.fontSize = fontSize;
-        cell.dataset.x = x; cell.dataset.y = y;
-
-        const atk = map[x][y];
-        if (atk[0] > 0 && atk[1] > 0)      cell.classList.add('attack-contested');
-        else if (atk[0] > atk[1])           cell.classList.add('attack-p1');
-        else if (atk[1] > atk[0])           cell.classList.add('attack-p2');
-
-        const piece = pieces.find(p => p.x === x && p.y === y);
-        if (piece) {
-          const token = document.createElement('div');
-          token.className = 'tile-token ' + (piece.team === 0 ? 'tile-p1' : 'tile-p2');
-          token.style.width = tokenSize + 'px';
-          token.style.height = tokenSize + 'px';
-          token.style.fontSize = fontSize;
-          if (piece.dead) token.classList.add('tile-dead');
-          token.textContent = PIECE_TYPES[piece.type].icon;
-          cell.appendChild(token);
-        }
-        grid.appendChild(cell);
-      }
+function startDrag(type, e) {
+  drag = { type, team: activeTeam };
+  ghost.textContent = PIECE_TYPES[type].icon;
+  ghost.style.color = activeTeam===0?'var(--p1)':'var(--p2)';
+  ghost.style.display = 'block';
+  moveGhost(e);
+}
+function moveGhost(e) {
+  const cx=e.touches?e.touches[0].clientX:e.clientX;
+  const cy=e.touches?e.touches[0].clientY:e.clientY;
+  ghost.style.left=cx+'px'; ghost.style.top=cy+'px';
+}
+function endDrag(e) {
+  ghost.style.display='none';
+  if (!drag) return;
+  const saved=drag; drag=null;
+  const cx=e.changedTouches?e.changedTouches[0].clientX:e.clientX;
+  const cy=e.changedTouches?e.changedTouches[0].clientY:e.clientY;
+  const el=document.elementFromPoint(cx,cy);
+  const cell=el&&(el.classList.contains('cell')?el:el.closest('.cell'));
+  if (cell) {
+    const x=parseInt(cell.dataset.x), y=parseInt(cell.dataset.y);
+    const existing=pieces.findIndex(p=>p.x===x&&p.y===y);
+    if (existing>=0) {
+      // Replace existing piece
+      pieces.splice(existing,1);
     }
+    pieces.push({x,y,type:saved.type,team:saved.team,dead:false});
+    resolved=false; stepState=null;
+    renderAll();
   }
+}
+document.addEventListener('mousemove', e=>drag&&moveGhost(e));
+document.addEventListener('touchmove', e=>drag&&moveGhost(e),{passive:true});
+document.addEventListener('mouseup', endDrag);
+document.addEventListener('touchend', endDrag);
 
-  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-  async function resolve() {
-    const btn = document.getElementById('btn-resolve');
-    btn.disabled = true;
-    document.getElementById('winner-msg').textContent = '';
-    document.getElementById('log').textContent = 'Resolving...';
-
-    let round = 0;
-    while (true) {
-      const elim = resolveBattleRound(pieces, SIZE);
-      if (elim.length === 0) break;
-
-      // Flash eliminated cells
-      renderBoard();
-      for (const p of elim) {
-        const cell = document.querySelector(`.cell[data-x="${p.x}"][data-y="${p.y}"]`);
-        if (cell) cell.classList.add('eliminating');
-      }
-      const names = elim.map(p => `${PIECE_TYPES[p.type].name}(${p.team === 0 ? 'Blue' : 'Orange'})`).join(', ');
-      document.getElementById('log').textContent = `Round ${round + 1}: eliminated ${names}`;
-      await sleep(700);
-      renderBoard();
-      await sleep(300);
-      round++;
-      if (round > 20) break;
-    }
-
-    // Final result
-    const map = buildAttackMap(pieces, SIZE);
-    const territory = getTerritoryCount(map, SIZE);
-    document.getElementById('log').textContent = `Battle complete after ${round} round(s).`;
-
-    // Evaluate
-    const kingsPerPlayer = getPieceCountsForSize(SIZE).KING;
-    const kingThreshold  = kingsPerPlayer === 1 ? 1 : 2;
-    const kings = [0, 1].map(t => pieces.filter(p => p.type === 'KING' && p.team === t && !p.dead).length);
-
-    let winner = null;
-    let reason = 'by Territory';
-    if (kings[0] - kings[1] >= kingThreshold || (kings[1] === 0 && kings[0] > 0)) {
-      winner = 0; reason = 'by General';
-    } else if (kings[1] - kings[0] >= kingThreshold || (kings[0] === 0 && kings[1] > 0)) {
-      winner = 1; reason = 'by General';
-    } else {
-      if      (territory[0] > territory[1]) winner = 0;
-      else if (territory[1] > territory[0]) winner = 1;
-    }
-
-    const wmsg = document.getElementById('winner-msg');
-    if (winner === null) {
-      wmsg.textContent = 'Draw!';
-      wmsg.style.color = '#ffd54f';
-    } else {
-      wmsg.textContent = `${winner === 0 ? 'Blue' : 'Orange'} Wins! ${reason}`;
-      wmsg.style.color = winner === 0 ? 'var(--p1)' : 'var(--p2)';
-    }
-
-    renderBoard();
-  }
-
-  document.getElementById('btn-resolve').addEventListener('click', resolve);
-  document.getElementById('btn-reset').addEventListener('click', () => {
-    resetPieces();
-    renderBoard();
-    document.getElementById('winner-msg').textContent = '';
-    document.getElementById('log').textContent = '';
-    document.getElementById('btn-resolve').disabled = false;
-  });
-
-  resetPieces();
+// ─── BOARD RENDER ─────────────────────────────────────────────────────────────
+function renderAll() {
   renderBoard();
+  updateScores();
+}
+
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.style.gridTemplateColumns = `repeat(${SIZE}, 72px)`;
+  board.innerHTML = '';
+
+  const displayPieces = stepState ? stepState.pieces : pieces;
+  const map = buildAttackMap(displayPieces, SIZE);
+
+  for (let y=SIZE-1;y>=0;y--) {
+    for (let x=0;x<SIZE;x++) {
+      const cell=document.createElement('div');
+      cell.className='cell';
+      cell.dataset.x=x; cell.dataset.y=y;
+
+      // Attack zone shading
+      const atk=map[x][y];
+      if (atk[0]>0&&atk[1]>0) cell.classList.add('atk-both');
+      else if (atk[0]>atk[1]) cell.classList.add('atk-p1');
+      else if (atk[1]>atk[0]) cell.classList.add('atk-p2');
+
+      // Attack counts label
+      if (atk[0]>0||atk[1]>0) {
+        const lbl=document.createElement('span');
+        lbl.className='atk-label';
+        lbl.textContent=`${atk[0]}:${atk[1]}`;
+        cell.appendChild(lbl);
+      }
+
+      const piece=displayPieces.find(p=>p.x===x&&p.y===y);
+      if (piece) {
+        const t=document.createElement('div');
+        t.className='tile tile-p'+(piece.team+1)+(piece.dead?' tile-dead':'');
+        t.textContent=PIECE_TYPES[piece.type].icon;
+        t.style.color=piece.team===0?'var(--p1)':'var(--p2)';
+        if (piece.dead) t.style.opacity='.22';
+        cell.appendChild(t);
+        // Click to remove (only when not resolved/stepping)
+        if (!resolved && !stepState) {
+          cell.style.cursor='pointer';
+          cell.addEventListener('click',()=>{
+            pieces=pieces.filter(p=>!(p.x===x&&p.y===y));
+            renderAll();
+          });
+          cell.title='Click to remove';
+        }
+      } else if (!drag) {
+        cell.style.cursor='crosshair';
+      }
+      board.appendChild(cell);
+    }
+  }
+}
+
+function updateScores() {
+  const displayPieces = stepState ? stepState.pieces : pieces;
+  const map=buildAttackMap(displayPieces,SIZE);
+  const t=getTerritoryCount(map,SIZE);
+  document.getElementById('score-p1').textContent=t[0];
+  document.getElementById('score-p2').textContent=t[1];
+  document.getElementById('score-sub').textContent=`P1 controls ${t[0]} cells · P2 controls ${t[1]} cells`;
+}
+
+// ─── RESOLUTION ──────────────────────────────────────────────────────────────
+function resetResolution() {
+  resolved=false; stepState=null;
+  pieces=origPieces.length ? origPieces.map(p=>({...p,dead:false})) : pieces.map(p=>({...p,dead:false}));
+  document.getElementById('step-log').innerHTML='<div class="log-info">Resolution reset.</div>';
+  document.getElementById('verdict').style.display='none';
+  renderAll();
+}
+
+function log(html) {
+  const el=document.getElementById('step-log');
+  el.innerHTML+=html;
+  el.scrollTop=el.scrollHeight;
+}
+
+function logPiece(p) {
+  const col=p.team===0?'var(--p1)':'var(--p2)';
+  return `<span style="color:${col}">${PIECE_TYPES[p.type].icon}${p.type}@(${p.x},${p.y})</span>`;
+}
+
+function resolveAll() {
+  origPieces=pieces.map(p=>({...p}));
+  document.getElementById('step-log').innerHTML='';
+  document.getElementById('verdict').style.display='none';
+  resolved=false; stepState=null;
+
+  const working=pieces.map(p=>({...p,dead:false}));
+  let round=0;
+  let totalElim=0;
+  log(`<div class="log-info">Starting resolution. ${working.filter(p=>!p.dead).length} pieces on board.</div>`);
+
+  while (round<30) {
+    const map=buildAttackMap(working,SIZE);
+    const elim=resolveBattleRound(working,SIZE);
+    if (!elim.length) break;
+    round++;
+    totalElim+=elim.length;
+    log(`<div class="log-round">Round ${round}: ${elim.length} piece(s) eliminated</div>`);
+    elim.forEach(p=>log(`<div class="log-elim">  💀 ${logPiece(p)} — P${p.team+1} piece out-attacked (atk[${p.team}]=${map[p.x][p.y][p.team]} vs atk[${1-p.team}]=${map[p.x][p.y][1-p.team]})</div>`));
+  }
+
+  pieces=working;
+  resolved=true;
+  showVerdict();
+  renderAll();
+  if (totalElim===0) log('<div class="log-ok">No eliminations — all pieces survived.</div>');
+  log('<div class="log-ok">Resolution complete.</div>');
+}
+
+function resolveStep() {
+  if (!stepState) {
+    origPieces=pieces.map(p=>({...p}));
+    stepState={pieces:pieces.map(p=>({...p,dead:false})),round:0};
+    document.getElementById('step-log').innerHTML='';
+    document.getElementById('verdict').style.display='none';
+    log(`<div class="log-info">Stepping through resolution. ${stepState.pieces.filter(p=>!p.dead).length} pieces on board.</div>`);
+  }
+
+  const map=buildAttackMap(stepState.pieces,SIZE);
+  const elim=resolveBattleRound(stepState.pieces,SIZE);
+
+  if (!elim.length) {
+    log('<div class="log-ok">✅ No more eliminations — resolution complete.</div>');
+    pieces=stepState.pieces;
+    resolved=true;
+    stepState=null;
+    showVerdict();
+    renderAll();
+    return;
+  }
+
+  stepState.round++;
+  // Highlight attacked cells
+  log(`<div class="log-round">Round ${stepState.round}: ${elim.length} piece(s) eliminated</div>`);
+
+  // Show attack map for eliminated pieces
+  elim.forEach(p=>{
+    const myAtk=map[p.x][p.y][p.team];
+    const theirAtk=map[p.x][p.y][1-p.team];
+    log(`<div class="log-elim">  💀 ${logPiece(p)} at (${p.x},${p.y})<br>
+      &nbsp;&nbsp;&nbsp;own attacks: ${myAtk} | opponent attacks: ${theirAtk} → eliminated</div>`);
+  });
+
+  // Highlight eliminated cells on board
+  setTimeout(()=>{
+    elim.forEach(p=>{
+      const cell=document.querySelector(`.cell[data-x="${p.x}"][data-y="${p.y}"]`);
+      if (cell) cell.classList.add('highlight');
+    });
+    setTimeout(()=>{
+      renderAll();
+    }, 600);
+  }, 50);
+
+  updateScores();
+}
+
+function showVerdict() {
+  const map=buildAttackMap(pieces,SIZE);
+  const t=getTerritoryCount(map,SIZE);
+  const kings=[0,1].map(tm=>pieces.filter(p=>p.type==='KING'&&p.team===tm&&!p.dead).length);
+  const kingsPerPlayer=Math.max(1,...pieces.filter(p=>p.type==='KING').map(p=>1));
+  const threshold=Math.max(...pieces.map(p=>p.team===0&&p.type==='KING'?1:0))===1?1:2;
+
+  let winner=null,reason='by Territory';
+  if(kings[0]-kings[1]>=1&&kings[1]===0&&kings[0]>0){winner=0;reason='by General';}
+  else if(kings[1]-kings[0]>=1&&kings[0]===0&&kings[1]>0){winner=1;reason='by General';}
+  else if(t[0]>t[1])winner=0;
+  else if(t[1]>t[0])winner=1;
+
+  const vEl=document.getElementById('verdict');
+  vEl.style.display='';
+  if (winner===null) {
+    vEl.textContent=`Draw — P1: ${t[0]} · P2: ${t[1]}`;
+    vEl.className='draw';
+  } else {
+    vEl.textContent=`Player ${winner+1} wins ${reason} — ${t[0]} vs ${t[1]}`;
+    vEl.className='ok';
+  }
+}
+
+// ─── PRESET ──────────────────────────────────────────────────────────────────
+function loadPreset() {
+  resetBoard();
+  const types=['KING','VERT','HORZ','X'];
+  const occ=new Set();
+  for (let team=0;team<2;team++) {
+    let placed=0;
+    const count=getPieceCountsForSize?getPieceCountsForSize(SIZE)[types[0]]:1;
+    const perType=SIZE<=4?1:SIZE<=6?2:4;
+    for (const t of types) {
+      let n=0;
+      while(n<perType) {
+        const x=Math.floor(Math.random()*SIZE), y=Math.floor(Math.random()*SIZE);
+        const key=`${x},${y}`;
+        if (!occ.has(key)) { occ.add(key); pieces.push({x,y,type:t,team,dead:false}); n++; }
+      }
+    }
+  }
+  renderAll();
+}
+
+function resetBoard() {
+  pieces=[]; origPieces=[]; resolved=false; stepState=null;
+  document.getElementById('step-log').innerHTML='<div class="log-info">Board cleared.</div>';
+  document.getElementById('verdict').style.display='none';
+  renderAll();
+}
+
+// ─── ENGINE SHIMS (pieces.js / board.js may not expose these globally) ────────
+function getPieceCountsForSize(s){
+  if(s<=4)return{KING:1,VERT:1,HORZ:1,X:1};
+  if(s<=6)return{KING:2,VERT:2,HORZ:2,X:2};
+  return{KING:4,VERT:4,HORZ:4,X:4};
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+buildTray();
+renderAll();
 </script>
 </body>
 </html>

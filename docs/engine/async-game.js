@@ -121,6 +121,7 @@ async function asyncSubmitCommitment(code, team, commitment, pieceCount, private
 
   blob.players[team].commitment = commitment;
   blob.players[team].pieceCount = pieceCount;
+  blob.players[team].hiddenPieces = null; // positions now known via reveal — clear hidden markers
 
   // Both committed? Advance to next phase.
   const bothCommitted = blob.players[0]?.commitment && blob.players[1]?.commitment;
