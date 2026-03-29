@@ -178,7 +178,8 @@ let drag = null;
 let resolved = false;
 let stepState = null;  // { pieces, round } for stepping
 
-const PIECE_TYPES = {
+// PIECE_TYPES already defined by engine/pieces.js
+const PIECE_META = {
   KING:  { icon:'♛', name:'General',    desc:'Cross ±2/4' },
   VERT:  { icon:'|',  name:'Vertical',   desc:'Full column' },
   HORZ:  { icon:'—',  name:'Horizontal', desc:'Full row' },
@@ -203,7 +204,7 @@ function buildTray() {
   const tray = document.getElementById('tray-ui');
   tray.innerHTML = '<div class="tray-label">Drag to place</div>';
   const color = activeTeam === 0 ? 'var(--p1)' : 'var(--p2)';
-  for (const [type, info] of Object.entries(PIECE_TYPES)) {
+  for (const [type, info] of Object.entries(PIECE_META)) {
     const div = document.createElement('div');
     div.className = 'piece-row' + (selectedType===type?' selected':'');
     div.innerHTML = `<span class="pr-icon" style="color:${color}">${info.icon}</span>
@@ -224,7 +225,7 @@ const ghost = document.getElementById('drag-ghost');
 
 function startDrag(type, e) {
   drag = { type, team: activeTeam };
-  ghost.textContent = PIECE_TYPES[type].icon;
+  ghost.textContent = PIECE_META[type].icon;
   ghost.style.color = activeTeam===0?'var(--p1)':'var(--p2)';
   ghost.style.display = 'block';
   moveGhost(e);
@@ -297,7 +298,7 @@ function renderBoard() {
       if (piece) {
         const t=document.createElement('div');
         t.className='tile tile-p'+(piece.team+1)+(piece.dead?' tile-dead':'');
-        t.textContent=PIECE_TYPES[piece.type].icon;
+        t.textContent=PIECE_META[piece.type].icon;
         t.style.color=piece.team===0?'var(--p1)':'var(--p2)';
         if (piece.dead) t.style.opacity='.22';
         cell.appendChild(t);
@@ -344,7 +345,7 @@ function log(html) {
 
 function logPiece(p) {
   const col=p.team===0?'var(--p1)':'var(--p2)';
-  return `<span style="color:${col}">${PIECE_TYPES[p.type].icon}${p.type}@(${p.x},${p.y})</span>`;
+  return `<span style="color:${col}">${PIECE_META[p.type].icon}${p.type}@(${p.x},${p.y})</span>`;
 }
 
 function resolveAll() {
