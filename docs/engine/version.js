@@ -3,8 +3,8 @@
 // Update BUILD_TIME on every release (UTC ISO string).
 // Inject <div id="version-badge"></div> anywhere in the page to get the badge.
 
-const VERSION = '0.5.4';
-const BUILD_TIME = '2026-03-29T20:06:21Z';  // updated each release
+const VERSION = '0.5.5';
+const BUILD_TIME = '2026-03-29T22:36:41Z';  // updated each release
 
 function timeAgo(isoStr) {
   const then = new Date(isoStr).getTime();

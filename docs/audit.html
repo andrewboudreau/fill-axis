@@ -211,7 +211,10 @@ async function renderAudit(data) {
   // We can verify hash(boardState + salt) only if salt is stored
   // Current audit record stores commitments but not salts (salt stays with player)
   // Show what we can
-  const s1 = data.p1Salt, s2 = data.p2Salt;
+  // Salts come from the audit record (top-level p1Salt/p2Salt)
+  // OR from the blob's revealedSalt fields if this is a raw game blob
+  const s1 = data.p1Salt || data.players?.[0]?.revealedSalt || null;
+  const s2 = data.p2Salt || data.players?.[1]?.revealedSalt || null;
   if (c1 && s1) {
     const computed = await sha256(bs1 + s1);
     const ok = computed === c1;

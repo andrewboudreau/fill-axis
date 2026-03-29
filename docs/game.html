@@ -289,7 +289,7 @@ function phasePlacement() {
     renderTrays(size);
     renderScores();
     const actEl = document.getElementById('actions');
-    actEl.innerHTML = `<button class="btn-a" onclick="endPlacementTurn()">🔒 Commit Board</button>`;
+    actEl.innerHTML = `<button class="btn-a" id="commit-btn" onclick="this.disabled=true;this.textContent='Committing...';endPlacementTurn()">🔒 Commit Board</button>`;
     return;
   }
 
@@ -386,8 +386,9 @@ async function phaseRevealed() {
     winner, winReason: reason,
     p1Commitment: blob.players[0].commitment,
     p2Commitment: blob.players[1].commitment,
-    p1Salt: myTeam===0 ? localState.salt : null,
-    p2Salt: myTeam===1 ? localState.salt : null,
+    // Both salts are in the blob after reveal — no need to rely on local state
+    p1Salt: blob.players[0].revealedSalt || (myTeam===0 ? localState.salt : null),
+    p2Salt: blob.players[1].revealedSalt || (myTeam===1 ? localState.salt : null),
     pieces: allPieces.map(p=>({x:p.x,y:p.y,type:p.type,team:p.team,dead:p.dead})),
     savedAt: new Date().toISOString(),
   }, {});
@@ -449,7 +450,12 @@ function renderPlacementActions(isMyTurn, tilesPerTurn) {
   }
 }
 
+let _committingInProgress = false;
 async function endPlacementTurn() {
+  if (_committingInProgress) return;
+  // Also block if already committed in blob
+  if (blob.players[myTeam]?.commitment) { renderPhase(); return; }
+  _committingInProgress = true;
   setStatus('Submitting turn...', false);
   window.__debug.event('END TURN', `pieces=${localState.pieces.length} tray=${JSON.stringify(localState.tray)}`);
   // Check if all my pieces are placed
@@ -481,6 +487,7 @@ async function endPlacementTurn() {
     blob = await asyncLoadGame(GAME_CODE);
     lastBlobUpdatedAt = blob.updatedAt;
   }
+  _committingInProgress = false;
   startPolling(); // restart polling after write
   renderPhase();
 }
